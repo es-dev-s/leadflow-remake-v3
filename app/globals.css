@@ -1,0 +1,333 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: #f8f9fa;
+  --foreground: #212529;
+  --surface: #ffffff;
+  --text: #212529;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+  --text-subtle: #868e96;
+  --border: rgba(33, 37, 41, 0.08);
+  --accent: #ff7a1a;
+  --accent-soft: rgba(255, 122, 26, 0.1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  height: 100%;
+  overflow: hidden;
+  scroll-behavior: auto;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, sans-serif;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(33, 37, 41, 0.1);
+  color: #212529;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-rise {
+    animation: none !important;
+  }
+}
+
+input,
+button,
+select,
+textarea {
+  color-scheme: light;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(33, 37, 41, 0.2);
+  border-radius: 4px;
+  background: #ffffff;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+input[type="checkbox"]:hover {
+  border-color: rgba(33, 37, 41, 0.35);
+}
+
+input[type="checkbox"]:checked {
+  background: #212529;
+  border-color: #212529;
+}
+
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
+}
+
+input[type="checkbox"]:indeterminate {
+  background: #212529;
+  border-color: #212529;
+}
+
+input[type="checkbox"]:indeterminate::before {
+  content: "";
+  width: 8px;
+  height: 1.5px;
+  background: #ffffff;
+  border-radius: 1px;
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(33, 37, 41, 0.28);
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:active {
+  transform: scale(0.94);
+}
+
+/* Thin, clean scrollbars — cohesive across the whole app.
+   Firefox uses the width/color hints; Chromium/WebKit uses the pseudo rules. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(33, 37, 41, 0.18) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(33, 37, 41, 0.16);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 150ms ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(33, 37, 41, 0.3);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Named scroll surfaces get an even more restrained bar. */
+.lf-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(33, 37, 41, 0.2) transparent;
+}
+
+.lf-scroll::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.lf-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lf-scroll::-webkit-scrollbar-thumb {
+  background: rgba(33, 37, 41, 0.16);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+  transition: background-color 150ms ease;
+}
+
+.lf-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(33, 37, 41, 0.3);
+  background-clip: content-box;
+}
+
+.lf-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hide horizontal scrollbar; keep the thin vertical one */
+.lf-scroll.lf-hide-x-bar::-webkit-scrollbar {
+  width: 5px;
+  height: 0 !important;
+}
+
+.lf-scroll.lf-hide-x-bar::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+.lf-scroll.lf-hide-x-bar::-webkit-scrollbar-thumb:horizontal {
+  display: none !important;
+  background: transparent !important;
+}
+
+.lf-scroll.lf-hide-x-bar::-webkit-scrollbar-corner {
+  display: none;
+  background: transparent;
+}
+
+.lf-pressable {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
+}
+
+@keyframes lf-action-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lf-row {
+  transition: background-color 140ms ease;
+}
+
+.lf-row mark {
+  color: inherit;
+  background-color: #ffe566;
+  border-radius: 2px;
+  padding: 0 1px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.lf-row:hover {
+  background-color: #f8f9fa;
+}
+
+.lf-row[data-selected="true"] {
+  background-color: #f1f3f5;
+}
+
+.lf-row[data-selected="true"]:hover {
+  background-color: #eceff1;
+}
+
+.lf-row[data-previewed="true"],
+.lf-row[data-previewed="true"]:hover {
+  background-color: #fff7ef;
+}
+
+.lf-row[data-previewed="true"][data-selected="true"],
+.lf-row[data-previewed="true"][data-selected="true"]:hover {
+  background-color: #fff1e3;
+}
+
+.lf-row[data-just-assigned="true"] {
+  animation: lf-assigned-flash 2.4s ease-out;
+  background-color: #ebfbee;
+}
+
+.lf-row[data-just-assigned="true"]:hover {
+  background-color: #d3f9d8;
+}
+
+@keyframes lf-assigned-flash {
+  0% {
+    background-color: #d3f9d8;
+  }
+  35% {
+    background-color: #ebfbee;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lf-pressable,
+  .lf-row,
+  input[type="checkbox"] {
+    transition: none !important;
+  }
+
+  .lf-row[data-just-assigned="true"] {
+    animation: none;
+  }
+
+  .lf-pressable:active:not(:disabled),
+  input[type="checkbox"]:active {
+    transform: none;
+  }
+}
+
+/* Safe-area insets for notched phones / landscape mobile chrome */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .lf-safe-pad {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+}
