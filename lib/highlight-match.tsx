@@ -16,11 +16,11 @@ export function HighlightText({
   className,
 }: {
   text: string;
-  query: string;
+  query?: string;
   className?: string;
 }): ReactNode {
   const value = text ?? "";
-  const q = query.trim();
+  const q = (query ?? "").trim();
   if (!q || !value || value === "—") {
     return className ? <span className={className}>{value}</span> : value;
   }
