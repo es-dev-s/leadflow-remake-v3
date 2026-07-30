@@ -11,11 +11,12 @@ import {
 } from "@/lib/navigation";
 import { canViewUsers, useAuthStore } from "@/store/auth-store";
 import {
+  canViewKpi,
   canViewLeadData,
-  isAnalystTeamLead,
   isLeadAnalyst,
-  isMainTeamLead,
   isSalesExecutive,
+  isAnalystTeamLead,
+  isMainTeamLead,
   isSuperadmin,
 } from "@/lib/roles";
 
@@ -137,6 +138,7 @@ export function Sidebar() {
     if (item.id === "transfers")
       return !isLeadAnalyst(user?.role) && !isSalesExecutive(user?.role);
     if (item.id === "pipeline") return canSeePipeline(user?.role);
+    if (item.id === "kpi") return canViewKpi(user?.role);
     return true;
   });
 

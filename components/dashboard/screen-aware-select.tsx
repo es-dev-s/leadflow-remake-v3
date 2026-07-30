@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -10,6 +11,12 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  computeDropdownPos,
+  dropdownShellClass,
+  flyoutEnterClass,
+  type FlyoutPos,
+} from "@/lib/flyout-position";
 
 export type SelectOption = {
   value: string;
@@ -28,52 +35,6 @@ type Props = {
   className?: string;
 };
 
-type MenuPos = {
-  top: number;
-  left: number;
-  width: number;
-  maxHeight: number;
-  placement: "top" | "bottom";
-};
-
-const GAP = 6;
-const VIEW_PAD = 8;
-
-function computeMenuPos(trigger: HTMLElement): MenuPos {
-  const rect = trigger.getBoundingClientRect();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const spaceBelow = Math.max(0, vh - rect.bottom - VIEW_PAD - GAP);
-  const spaceAbove = Math.max(0, rect.top - VIEW_PAD - GAP);
-  const preferred = 280;
-  const placeBottom = spaceBelow >= 140 || spaceBelow >= spaceAbove;
-  const available = placeBottom ? spaceBelow : spaceAbove;
-  const maxHeight = Math.max(120, Math.min(preferred, available));
-  const width = Math.min(rect.width, vw - VIEW_PAD * 2);
-  let left = rect.left;
-  if (left + width > vw - VIEW_PAD) left = vw - VIEW_PAD - width;
-  if (left < VIEW_PAD) left = VIEW_PAD;
-
-  if (placeBottom) {
-    return {
-      top: Math.min(rect.bottom + GAP, vh - VIEW_PAD - 80),
-      left,
-      width,
-      maxHeight,
-      placement: "bottom",
-    };
-  }
-
-  const top = Math.max(VIEW_PAD, rect.top - GAP - maxHeight);
-  return {
-    top,
-    left,
-    width,
-    maxHeight: Math.min(maxHeight, rect.top - GAP - top),
-    placement: "top",
-  };
-}
-
 export function ScreenAwareSelect({
   id,
   value,
@@ -89,12 +50,24 @@ export function ScreenAwareSelect({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const openGenRef = useRef(0);
+  const rafRef = useRef(0);
+  const aliveRef = useRef(true);
+
   const [open, setOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
   const [query, setQuery] = useState("");
-  const [pos, setPos] = useState<MenuPos | null>(null);
+  const [pos, setPos] = useState<FlyoutPos | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    aliveRef.current = true;
+    setMounted(true);
+    return () => {
+      aliveRef.current = false;
+      window.cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const selected = useMemo(
     () => options.find((item) => item.value === value) ?? null,
@@ -111,43 +84,105 @@ export function ScreenAwareSelect({
     );
   }, [options, query]);
 
-  const updatePos = () => {
+  const updatePos = useCallback(() => {
     const trigger = triggerRef.current;
-    if (!trigger) return;
-    setPos(computeMenuPos(trigger));
-  };
+    if (!trigger || !aliveRef.current) return;
+    const next = computeDropdownPos(trigger, {
+      preferredHeight: searchable ? 300 : 260,
+      panelEl: menuRef.current,
+    });
+    setPos((prev) => {
+      if (
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.width === next.width &&
+        prev.maxHeight === next.maxHeight &&
+        prev.placement === next.placement
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [searchable]);
+
+  const schedulePos = useCallback(() => {
+    window.cancelAnimationFrame(rafRef.current);
+    rafRef.current = window.requestAnimationFrame(updatePos);
+  }, [updatePos]);
+
+  const close = useCallback(() => {
+    const gen = openGenRef.current;
+    setEntered(false);
+    window.setTimeout(() => {
+      if (!aliveRef.current || openGenRef.current !== gen) return;
+      setOpen(false);
+      setPos(null);
+      setQuery("");
+    }, 140);
+  }, []);
+
+  const openMenu = useCallback(() => {
+    if (disabled) return;
+    openGenRef.current += 1;
+    setOpen(true);
+    setEntered(false);
+  }, [disabled]);
 
   useLayoutEffect(() => {
     if (!open) return;
     updatePos();
-  }, [open, filtered.length]);
+    const id = window.requestAnimationFrame(() => {
+      if (!aliveRef.current) return;
+      updatePos();
+      setEntered(true);
+      const selectedEl = menuRef.current?.querySelector<HTMLElement>(
+        '[aria-selected="true"]',
+      );
+      selectedEl?.scrollIntoView({ block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open, filtered.length, updatePos]);
 
   useEffect(() => {
-    if (!open) {
-      setQuery("");
-      return;
-    }
-    const onReposition = () => updatePos();
+    if (!open) return;
+    const gen = openGenRef.current;
+    const onReposition = () => {
+      if (openGenRef.current !== gen) return;
+      schedulePos();
+    };
     const onPointer = (event: MouseEvent) => {
+      if (openGenRef.current !== gen) return;
       const target = event.target as Node;
       if (rootRef.current?.contains(target)) return;
       if (menuRef.current?.contains(target)) return;
-      setOpen(false);
+      close();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (openGenRef.current !== gen) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
     };
+    const ro =
+      typeof ResizeObserver !== "undefined" && menuRef.current
+        ? new ResizeObserver(onReposition)
+        : null;
+    if (menuRef.current && ro) ro.observe(menuRef.current);
+
     window.addEventListener("resize", onReposition);
     window.addEventListener("scroll", onReposition, true);
     window.addEventListener("mousedown", onPointer);
     window.addEventListener("keydown", onKey);
     return () => {
+      ro?.disconnect();
       window.removeEventListener("resize", onReposition);
       window.removeEventListener("scroll", onReposition, true);
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, close, schedulePos]);
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
@@ -161,14 +196,16 @@ export function ScreenAwareSelect({
         aria-controls={listId}
         aria-required={required || undefined}
         onClick={() => {
-          if (!disabled) setOpen((v) => !v);
+          if (disabled) return;
+          if (open) close();
+          else openMenu();
         }}
         className={[
           "lf-pressable flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-left text-[13px] outline-none transition-[border-color,box-shadow,background-color]",
           disabled
             ? "cursor-not-allowed border-[rgba(33,37,41,0.06)] bg-[#f8f9fa] text-[#adb5bd]"
             : open
-              ? "border-[rgba(232,104,18,0.5)] bg-white shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
+              ? "border-[rgba(232,104,18,0.45)] bg-white shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
               : "border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] hover:border-[rgba(33,37,41,0.16)]",
         ].join(" ")}
       >
@@ -182,8 +219,8 @@ export function ScreenAwareSelect({
         <ChevronDown
           size={15}
           strokeWidth={1.75}
-          className={`shrink-0 text-[#adb5bd] transition-transform ${
-            open ? "rotate-180" : ""
+          className={`shrink-0 text-[#adb5bd] transition-transform duration-150 ${
+            open ? "rotate-180 text-[#e86812]" : ""
           }`}
         />
       </button>
@@ -194,25 +231,30 @@ export function ScreenAwareSelect({
               ref={menuRef}
               id={listId}
               role="listbox"
+              data-flyout-panel="select"
               style={{
                 position: "fixed",
                 top: pos.top,
                 left: pos.left,
                 width: pos.width,
                 maxHeight: pos.maxHeight,
-                zIndex: 120,
+                zIndex: 140,
               }}
-              className="flex flex-col overflow-hidden rounded-xl border border-[rgba(33,37,41,0.1)] bg-white shadow-[0_16px_48px_rgba(15,17,20,0.16)]"
+              className={[
+                "flex flex-col overflow-hidden transition-[opacity,transform] duration-150 ease-out",
+                dropdownShellClass(),
+                flyoutEnterClass(pos, entered),
+              ].join(" ")}
             >
               {searchable ? (
-                <div className="shrink-0 border-b border-[rgba(33,37,41,0.06)] p-2">
+                <div className="shrink-0 border-b border-[rgba(33,37,41,0.05)] p-2">
                   <input
                     autoFocus
                     type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search…"
-                    className="h-9 w-full rounded-lg border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-2.5 text-[13px] text-[#212529] outline-none placeholder:text-[#adb5bd] focus:border-[rgba(232,104,18,0.4)] focus:bg-white"
+                    className="h-9 w-full rounded-lg border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-2.5 text-[13px] text-[#212529] outline-none placeholder:text-[#adb5bd] focus:border-[rgba(232,104,18,0.35)] focus:bg-white"
                   />
                 </div>
               ) : null}
@@ -225,9 +267,9 @@ export function ScreenAwareSelect({
                     aria-selected={!value}
                     onClick={() => {
                       onChange("");
-                      setOpen(false);
+                      close();
                     }}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-[#868e96] hover:bg-[#f8f9fa]"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-[13px] text-[#868e96] hover:bg-[#f8f9fa]"
                   >
                     <span>{placeholder}</span>
                   </button>
@@ -248,10 +290,10 @@ export function ScreenAwareSelect({
                         aria-selected={active}
                         onClick={() => {
                           onChange(option.value);
-                          setOpen(false);
+                          close();
                         }}
                         className={[
-                          "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-[13px] transition-colors",
+                          "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-[13px] transition-colors",
                           active
                             ? "bg-[#fff7ef] font-medium text-[#9a3f00]"
                             : "text-[#212529] hover:bg-[#f8f9fa]",

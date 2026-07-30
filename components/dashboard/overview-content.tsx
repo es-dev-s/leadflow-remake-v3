@@ -318,7 +318,7 @@ export function OverviewContent() {
             }`}
           >
             {teamScoped ? null : (
-              <div className="h-[360px] min-h-0">
+              <div className="h-[400px] min-h-0">
                 <AnalystQualificationTable />
               </div>
             )}

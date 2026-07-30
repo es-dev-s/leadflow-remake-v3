@@ -20,6 +20,7 @@ export type LeadRecord = {
   stage: string;
   stageRaw: string;
   closed: string;
+  notAppropriate?: boolean;
   ip: string;
   dealValue: string;
   team: string;

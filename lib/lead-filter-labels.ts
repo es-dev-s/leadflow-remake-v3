@@ -8,6 +8,7 @@ export const LEAD_PRESET_OPTIONS = [
   { id: "qualified", label: "Qualified" },
   { id: "new", label: "Not qualified" },
   { id: "irrelevant", label: "Irrelevant" },
+  { id: "not-appropriate", label: "Not appropriate" },
   { id: "passed-se-tl", label: "Passed to SE/TLs" },
   { id: "not-passed", label: "Not passed" },
   { id: "in-progress", label: "In progress" },

@@ -2,6 +2,7 @@ import {
   ArrowLeftRight,
   Contact,
   FileBarChart2,
+  Gauge,
   GitBranch,
   LayoutDashboard,
   Settings,
@@ -39,6 +40,13 @@ export const mainNavItems: NavItem[] = [
     href: "/pipeline",
     icon: GitBranch,
     description: "Sales stages for your leads",
+  },
+  {
+    id: "kpi",
+    label: "KPI",
+    href: "/kpi",
+    icon: Gauge,
+    description: "Operational KPI counts and ratios",
   },
   {
     id: "users",

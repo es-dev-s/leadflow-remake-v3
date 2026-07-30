@@ -82,4 +82,10 @@ export type CreateLeadPayload = {
   leadScore?: number;
   createdAt?: string;
   notes?: string;
+  /** Local datetime of first customer message (YYYY-MM-DDTHH:mm). */
+  firstClientMessageAt?: string | null;
+  /** Local datetime of first agent reply (YYYY-MM-DDTHH:mm). */
+  firstAgentMessageAt?: string | null;
+  /** Public path from upload API, or empty string to clear. */
+  firstResponseProofPath?: string | null;
 };

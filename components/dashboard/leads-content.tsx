@@ -155,13 +155,20 @@ function ColumnCell({
       );
     case "tag":
       return (
-        <td className="px-3 py-3 align-middle">
-          {lead.isNew || lead.tag === "New" ? (
-            <span className="inline-flex rounded-md bg-[#ebfbee] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#2b8a3e] uppercase">
+        <td className="min-w-0 overflow-hidden px-3 py-3 align-middle">
+          {lead.notAppropriate || lead.tag === "Not appropriate" ? (
+            <span
+              title="Not appropriate"
+              className="inline-flex max-w-full items-center rounded border border-[rgba(201,42,42,0.2)] bg-[#fff5f5] px-1.5 py-px text-[10px] font-medium leading-4 text-[#c92a2a] whitespace-nowrap"
+            >
+              <span className="truncate">Not appropriate</span>
+            </span>
+          ) : lead.isNew || lead.tag === "New" ? (
+            <span className="inline-flex items-center rounded border border-[rgba(47,158,68,0.22)] bg-[#ebfbee] px-1.5 py-px text-[10px] font-medium leading-4 text-[#2b8a3e] whitespace-nowrap">
               New
             </span>
           ) : (
-            <span className="text-[13px] text-[#adb5bd]">—</span>
+            <span className="text-[12px] text-[#adb5bd]">—</span>
           )}
         </td>
       );
@@ -208,15 +215,27 @@ function ColumnCell({
     case "status":
       return (
         <td
-          className="px-3 py-3 align-middle"
+          className="min-w-0 overflow-hidden px-3 py-3 align-middle"
           onClick={(event) => event.stopPropagation()}
         >
-          <QualificationBadgeSelect
-            leadId={lead.id}
-            statusRaw={lead.statusRaw}
-            statusLabel={lead.status}
-            editable={qualificationEditable}
-          />
+          <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1">
+            <div className="min-w-0 shrink">
+              <QualificationBadgeSelect
+                leadId={lead.id}
+                statusRaw={lead.statusRaw}
+                statusLabel={lead.status}
+                editable={qualificationEditable}
+              />
+            </div>
+            {lead.notAppropriate || lead.tag === "Not appropriate" ? (
+              <span
+                title="Not appropriate"
+                className="inline-flex max-w-[7.5rem] shrink-0 items-center rounded border border-[rgba(201,42,42,0.2)] bg-[#fff5f5] px-1.5 py-px text-[10px] font-medium leading-4 text-[#c92a2a] whitespace-nowrap"
+              >
+                <span className="truncate">Not appropriate</span>
+              </span>
+            ) : null}
+          </div>
         </td>
       );
     case "score":

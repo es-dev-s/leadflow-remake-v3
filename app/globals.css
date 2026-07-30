@@ -205,6 +205,38 @@ input[type="checkbox"]:active {
   background: transparent;
 }
 
+/* Premium flyout / popup scrollbars — slim, soft, inset from edge. */
+.lf-flyout-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(33, 37, 41, 0.22) transparent;
+}
+
+.lf-flyout-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.lf-flyout-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 8px;
+}
+
+.lf-flyout-scroll::-webkit-scrollbar-thumb {
+  background: rgba(33, 37, 41, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.lf-flyout-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(33, 37, 41, 0.28);
+  background-clip: content-box;
+}
+
+.lf-flyout-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Hide horizontal scrollbar; keep the thin vertical one */
 .lf-scroll.lf-hide-x-bar::-webkit-scrollbar {
   width: 5px;

@@ -136,10 +136,12 @@ export function QualificationBadgeSelect({
 
   if (!editable) {
     return (
-      <div className="relative min-w-0">
+      <div className="relative min-w-0 max-w-full">
         <span
+          title={qualificationLabel(current || statusRaw) || statusLabel || "—"}
           className={[
-            "inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
+            "inline-flex max-w-full items-center rounded px-1.5 py-px text-[10px] font-medium leading-4 whitespace-nowrap",
+            "border",
             badgeClass(current || statusRaw),
           ].join(" ")}
         >
@@ -152,7 +154,7 @@ export function QualificationBadgeSelect({
   }
 
   return (
-    <div ref={rootRef} className="relative min-w-0">
+    <div ref={rootRef} className="relative min-w-0 max-w-full">
       <button
         ref={buttonRef}
         type="button"
@@ -160,32 +162,33 @@ export function QualificationBadgeSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Change qualification"
+        title={qualificationLabel(current || statusRaw) || statusLabel || "—"}
         onClick={(event) => {
           event.stopPropagation();
           setOpen((value) => !value);
         }}
         className={[
-          "lf-pressable inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-[background-color,border-color,color,opacity] duration-200 disabled:opacity-70",
+          "lf-pressable inline-flex max-w-full items-center gap-0.5 rounded border px-1.5 py-px text-[10px] font-medium leading-4 whitespace-nowrap transition-[background-color,border-color,color,opacity] duration-200 disabled:opacity-70",
           phase === "success"
             ? "border-[rgba(47,158,68,0.28)] bg-[#ebfbee] text-[#2b8a3e]"
             : badgeClass(current || statusRaw),
         ].join(" ")}
       >
-        <span className="truncate">
+        <span className="min-w-0 truncate">
           {phase === "success"
             ? "Saved"
             : qualificationLabel(current || statusRaw) || statusLabel || "—"}
         </span>
         {phase === "pending" ? (
-          <LoaderCircle size={11} className="shrink-0 animate-spin" />
+          <LoaderCircle size={10} className="shrink-0 animate-spin" />
         ) : phase === "success" ? (
           <Check
-            size={11}
+            size={10}
             strokeWidth={2.25}
             className="shrink-0 animate-[lf-action-pop_320ms_ease-out]"
           />
         ) : (
-          <ChevronDown size={11} className="shrink-0 opacity-70" />
+          <ChevronDown size={10} className="shrink-0 opacity-60" />
         )}
       </button>
       {error ? (
@@ -198,11 +201,11 @@ export function QualificationBadgeSelect({
             <div
               id={listId}
               role="listbox"
-              className="fixed z-[140] overflow-hidden rounded-xl border border-[rgba(33,37,41,0.1)] bg-white py-1 shadow-[0_16px_40px_rgba(15,17,20,0.14)]"
+              className="fixed z-[140] overflow-hidden rounded-lg border border-[rgba(33,37,41,0.1)] bg-white py-1 shadow-[0_16px_40px_rgba(15,17,20,0.14)]"
               style={{
                 top: menuPos.top,
                 left: Math.max(8, menuPos.left),
-                width: menuPos.width,
+                width: Math.max(menuPos.width, 168),
               }}
               onMouseDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
@@ -219,7 +222,7 @@ export function QualificationBadgeSelect({
                       void select(option.value);
                     }}
                     className={[
-                      "flex w-full items-center px-3 py-2 text-left text-[12px] transition-colors",
+                      "flex w-full items-center px-2.5 py-1.5 text-left transition-colors",
                       active
                         ? "bg-[#fff7ef] font-medium text-[#9a3f00]"
                         : "text-[#212529] hover:bg-[#f8f9fa]",
@@ -227,7 +230,7 @@ export function QualificationBadgeSelect({
                   >
                     <span
                       className={[
-                        "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                        "inline-flex rounded border px-1.5 py-px text-[10px] font-medium leading-4 whitespace-nowrap",
                         badgeClass(option.value),
                       ].join(" ")}
                     >

@@ -227,7 +227,7 @@ export function UsersContent() {
     roleFilter !== "all" ? roleFilter : undefined;
 
   const pageSubtitle = isAnalystTeamLead(currentUser?.role)
-    ? "Manage Lead Analysts and Main Team Leads"
+    ? "Manage Lead Analysts, Main Team Leads, and Sales Executives"
     : isMainTeamLead(currentUser?.role)
       ? currentUser?.teamName
         ? `Create, edit, transfer, and remove sales executives on ${currentUser.teamName}`

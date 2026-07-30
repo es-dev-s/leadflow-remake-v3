@@ -1,6 +1,8 @@
 "use client";
 
 import { ActionButton } from "@/components/dashboard/action-button";
+import { FirstResponseProofDrop } from "@/components/dashboard/first-response-proof-drop";
+import { ScreenAwareDateTimePicker } from "@/components/dashboard/screen-aware-datetime-picker";
 import { ScreenAwareSelect } from "@/components/dashboard/screen-aware-select";
 import {
   createLead,
@@ -113,6 +115,19 @@ function todayLocalDateValue() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Normalize API/detail dates to YYYY-MM-DD for the date picker + backend. */
+function toFormDateValue(raw: string | null | undefined) {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return todayLocalDateValue();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const dt = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (dt) return `${dt[1]}-${dt[2]}-${dt[3]}`;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return todayLocalDateValue();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
+}
+
 type FormState = {
   fullName: string;
   email: string;
@@ -129,6 +144,9 @@ type FormState = {
   leadScore: number;
   createdAt: string;
   notes: string;
+  firstClientMessageAt: string;
+  firstAgentMessageAt: string;
+  firstResponseProofPath: string;
 };
 
 function emptyForm(): FormState {
@@ -148,7 +166,34 @@ function emptyForm(): FormState {
     leadScore: 50,
     createdAt: todayLocalDateValue(),
     notes: "",
+    firstClientMessageAt: "",
+    firstAgentMessageAt: "",
+    firstResponseProofPath: "",
   };
+}
+
+function formatDurationLabel(totalMinutes: number) {
+  const whole = Math.max(0, Math.round(totalMinutes));
+  const h = Math.floor(whole / 60);
+  const m = whole % 60;
+  if (h <= 0) return `${m} min`;
+  if (m <= 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+/** Minutes between client and agent first-message times, or NaN if invalid. */
+function durationBetween(clientAt: string, agentAt: string): number | null {
+  const client = clientAt.trim();
+  const agent = agentAt.trim();
+  if (!client && !agent) return null;
+  if (!client || !agent) return Number.NaN;
+  const start = new Date(client);
+  const end = new Date(agent);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return Number.NaN;
+  }
+  if (end.getTime() < start.getTime()) return Number.NaN;
+  return Math.round((end.getTime() - start.getTime()) / 60_000);
 }
 
 function formFromDetail(detail: LeadDetail): FormState {
@@ -181,8 +226,11 @@ function formFromDetail(detail: LeadDetail): FormState {
     qualificationStatus: detail.qualificationStatus || "QUALIFIED",
     leadScore:
       typeof detail.leadScore === "number" ? detail.leadScore : 50,
-    createdAt: detail.createdAt || todayLocalDateValue(),
+    createdAt: toFormDateValue(detail.createdAt),
     notes: detail.notes ?? "",
+    firstClientMessageAt: detail.firstClientMessageAt ?? "",
+    firstAgentMessageAt: detail.firstAgentMessageAt ?? "",
+    firstResponseProofPath: detail.firstResponseProofPath ?? "",
   };
 }
 
@@ -414,6 +462,12 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     }));
   };
 
+  const firstResponseMinutes = useMemo(
+    () =>
+      durationBetween(form.firstClientMessageAt, form.firstAgentMessageAt),
+    [form.firstClientMessageAt, form.firstAgentMessageAt],
+  );
+
   const canSubmit = useMemo(() => {
     if (loading) return false;
     if (duplicateTeam) return false;
@@ -422,8 +476,16 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     if (!form.source) return false;
     if (!form.qualificationStatus) return false;
     if (portalIsOther && !form.portalOther.trim()) return false;
+    if (Number.isNaN(firstResponseMinutes)) return false;
     return true;
-  }, [form, portalIsOther, loading, duplicateTeam, duplicateChecking]);
+  }, [
+    form,
+    portalIsOther,
+    loading,
+    duplicateTeam,
+    duplicateChecking,
+    firstResponseMinutes,
+  ]);
 
   if (!mounted || !present) return null;
 
@@ -465,6 +527,9 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     }
     if (form.createdAt.trim()) payload.createdAt = form.createdAt.trim();
     if (form.notes.trim()) payload.notes = form.notes.trim();
+    payload.firstClientMessageAt = form.firstClientMessageAt.trim() || null;
+    payload.firstAgentMessageAt = form.firstAgentMessageAt.trim() || null;
+    payload.firstResponseProofPath = form.firstResponseProofPath.trim() || "";
 
     startSubmit();
     setError(null);
@@ -497,7 +562,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
         type="button"
         aria-label="Close dialog"
         className={[
-          "absolute inset-0 bg-[rgba(15,17,20,0.38)] backdrop-blur-md transition-opacity duration-300 ease-out",
+          "absolute inset-0 z-0 bg-[rgba(15,17,20,0.38)] backdrop-blur-md transition-opacity duration-300 ease-out",
           entered ? "opacity-100" : "opacity-0",
         ].join(" ")}
         onClick={() => {
@@ -505,12 +570,19 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
         }}
       />
 
+      {/* Date/time panels portal here — under the drawer so they emerge from behind it. */}
+      <div
+        data-flyout-layer=""
+        className="pointer-events-none absolute inset-0 z-[1] overflow-hidden"
+      />
+
       <aside
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-flyout-host="drawer"
         className={[
-          "relative flex h-dvh w-full max-w-[560px] flex-col overflow-hidden border-l border-[rgba(33,37,41,0.08)] bg-white shadow-[-24px_0_80px_rgba(15,17,20,0.16)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:max-w-[640px] lg:max-w-[720px]",
+          "relative z-[2] flex h-dvh w-full max-w-[560px] flex-col overflow-hidden border-l border-[rgba(33,37,41,0.08)] bg-white shadow-[-24px_0_80px_rgba(15,17,20,0.16)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] sm:max-w-[640px] lg:max-w-[720px]",
           entered ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
       >
@@ -797,13 +869,13 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
               <div>
                 <FieldLabel htmlFor="lead-date">Date</FieldLabel>
-                <input
+                <ScreenAwareDateTimePicker
                   id="lead-date"
-                  type="date"
-                  className={inputClass}
+                  mode="date"
                   value={form.createdAt}
-                  onChange={(e) => set("createdAt")(e.target.value)}
+                  onChange={(value) => set("createdAt")(value)}
                   disabled={loading}
+                  placeholder="Select lead date"
                 />
               </div>
 
@@ -913,6 +985,69 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   placeholder="Context, objections, next steps…"
                 />
               </div>
+            </Section>
+
+            <Section
+              title="First response"
+              description="Record first client and first agent message times. Duration is calculated automatically. Attach screenshot proof."
+            >
+              <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <FieldLabel htmlFor="lead-fr-client">
+                    First client message
+                  </FieldLabel>
+                  <ScreenAwareDateTimePicker
+                    id="lead-fr-client"
+                    mode="datetime"
+                    value={form.firstClientMessageAt}
+                    onChange={(value) => set("firstClientMessageAt")(value)}
+                    disabled={loading}
+                    placeholder="Client message time"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <FieldLabel htmlFor="lead-fr-agent">
+                    First agent message
+                  </FieldLabel>
+                  <ScreenAwareDateTimePicker
+                    id="lead-fr-agent"
+                    mode="datetime"
+                    value={form.firstAgentMessageAt}
+                    onChange={(value) => set("firstAgentMessageAt")(value)}
+                    disabled={loading}
+                    placeholder="Agent reply time"
+                  />
+                </div>
+              </div>
+              <div className="sm:col-span-2 rounded-xl border border-[rgba(33,37,41,0.06)] bg-[#f8f9fa] px-3.5 py-3">
+                <p className="text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+                  Calculated response time
+                </p>
+                {Number.isNaN(firstResponseMinutes) ? (
+                  <p className="mt-1.5 text-[13px] text-[#c92a2a]">
+                    {!form.firstClientMessageAt.trim() ||
+                    !form.firstAgentMessageAt.trim()
+                      ? "Enter both times to calculate duration"
+                      : "Agent time must be on or after client time"}
+                  </p>
+                ) : firstResponseMinutes != null ? (
+                  <p className="mt-1.5 text-[22px] font-medium tracking-[-0.04em] tabular-nums text-[#212529]">
+                    {formatDurationLabel(firstResponseMinutes)}
+                    <span className="ml-2 text-[12px] font-normal text-[#868e96]">
+                      ({firstResponseMinutes.toLocaleString("en-US")} min)
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-1.5 text-[13px] text-[#adb5bd]">
+                    Optional — leave both blank if not measured yet
+                  </p>
+                )}
+              </div>
+              <FirstResponseProofDrop
+                value={form.firstResponseProofPath}
+                disabled={loading}
+                onChange={(path) => set("firstResponseProofPath")(path)}
+              />
             </Section>
           </div>
 

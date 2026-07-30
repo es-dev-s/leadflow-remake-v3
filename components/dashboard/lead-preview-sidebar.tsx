@@ -10,9 +10,17 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SeOutcomeForm } from "@/components/dashboard/se-outcome-form";
-import { fetchLead, type LeadDetail } from "@/lib/api";
+import {
+  BACKEND_URL,
+  fetchLead,
+  markLeadNotAppropriate,
+  type LeadDetail,
+} from "@/lib/api";
+import { getAuthToken } from "@/lib/auth-token";
+import { leadDetailToListPatch } from "@/lib/lead-record-map";
 import {
   canEditLeadProfile,
+  canMarkNotAppropriate,
   canUpdateSalesOutcome,
   isSalesExecutive,
 } from "@/lib/roles";
@@ -22,10 +30,87 @@ import { useUiStore } from "@/store/ui-store";
 
 const EXIT_MS = 0;
 const PANEL_WIDTH = 380;
+const REASON_MIN = 10;
+const REASON_MAX = 2000;
 
 type Props = {
   onEdit: (leadId: string) => void;
 };
+
+function formatFirstResponse(minutes: number) {
+  const whole = Math.max(0, Math.round(minutes));
+  const h = Math.floor(whole / 60);
+  const m = whole % 60;
+  if (h <= 0) return `${m} min`;
+  if (m <= 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function formatDateTimeLabel(value: string | null | undefined) {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw.replace("T", " ");
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function ProofThumb({ path }: { path: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let revoked: string | null = null;
+    const controller = new AbortController();
+    const token = getAuthToken();
+    const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
+    void fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("failed");
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        revoked = objectUrl;
+        if (!controller.signal.aborted) setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSrc(null);
+      });
+    return () => {
+      controller.abort();
+      if (revoked) URL.revokeObjectURL(revoked);
+    };
+  }, [path]);
+
+  if (!src) {
+    return (
+      <p className="text-[12px] text-[#adb5bd]">Screenshot proof unavailable</p>
+    );
+  }
+
+  return (
+    <a
+      href={src}
+      target="_blank"
+      rel="noreferrer"
+      className="block overflow-hidden rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa]"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt="First response proof"
+        className="max-h-40 w-full object-contain"
+      />
+    </a>
+  );
+}
 
 function Field({
   label,
@@ -54,19 +139,33 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   const allowProfileEdit = canEditLeadProfile(role);
   const allowSalesOutcome = canUpdateSalesOutcome(role);
+  const allowNotAppropriate = canMarkNotAppropriate(role);
   const seMode = isSalesExecutive(role);
+  const patchLead = useLeadsStore((s) => s.patchLead);
 
   const [renderedId, setRenderedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<LeadDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
+  const [reasonSubmitting, setReasonSubmitting] = useState(false);
   const fetchGen = useRef(0);
   const closeTimer = useRef<number | null>(null);
+  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
   const listLead =
     renderedId != null
       ? (leadItems.find((lead) => lead.id === renderedId) ?? null)
       : null;
+
+  const resetReasonForm = () => {
+    setReasonOpen(false);
+    setReason("");
+    setReasonError(null);
+    setReasonSubmitting(false);
+  };
 
   // Instant open/close — no width animation (avoids table scroll jitter).
   useEffect(() => {
@@ -78,10 +177,12 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
     if (previewLeadId) {
       setRenderedId(previewLeadId);
       setExpanded(true);
+      resetReasonForm();
       return;
     }
 
     setExpanded(false);
+    resetReasonForm();
     if (EXIT_MS <= 0) {
       setRenderedId(null);
       setDetail(null);
@@ -137,11 +238,25 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
   useEffect(() => {
     if (!expanded) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeLeadPreview();
+      if (event.key === "Escape") {
+        if (reasonOpen && !reasonSubmitting) {
+          resetReasonForm();
+          return;
+        }
+        closeLeadPreview();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [expanded, closeLeadPreview]);
+  }, [expanded, closeLeadPreview, reasonOpen, reasonSubmitting]);
+
+  useEffect(() => {
+    if (!reasonOpen) return;
+    const id = window.requestAnimationFrame(() => {
+      reasonRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [reasonOpen]);
 
   if (!renderedId) return null;
 
@@ -149,7 +264,40 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
     detail?.fullName?.trim() ||
     listLead?.leadLabel?.trim() ||
     "Lead details";
+  const isNotAppropriate =
+    Boolean(detail?.notAppropriate) ||
+    Boolean(listLead?.notAppropriate) ||
+    listLead?.tag === "Not appropriate";
+  const notAppropriateReason =
+    detail?.notAppropriateReason?.trim() ||
+    "";
+  const canSubmitNotAppropriate = allowNotAppropriate && !isNotAppropriate;
 
+  const submitNotAppropriate = async () => {
+    const trimmed = reason.trim();
+    if (trimmed.length < REASON_MIN) {
+      setReasonError(`Please explain why (at least ${REASON_MIN} characters).`);
+      return;
+    }
+    if (trimmed.length > REASON_MAX) {
+      setReasonError(`Reason must be at most ${REASON_MAX} characters.`);
+      return;
+    }
+    setReasonSubmitting(true);
+    setReasonError(null);
+    try {
+      const updated = await markLeadNotAppropriate(renderedId, trimmed);
+      setDetail(updated);
+      patchLead(renderedId, leadDetailToListPatch(updated));
+      resetReasonForm();
+    } catch (err: unknown) {
+      setReasonError(
+        err instanceof Error ? err.message : "Failed to submit reason",
+      );
+    } finally {
+      setReasonSubmitting(false);
+    }
+  };
   return (
     <>
       {expanded ? (
@@ -234,6 +382,30 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                   </p>
                 </div>
               </div>
+
+              {isNotAppropriate ? (
+                <div
+                  role="status"
+                  className="rounded-xl border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-3 py-3"
+                >
+                  <p className="text-[11px] font-semibold tracking-[0.06em] text-[#c92a2a] uppercase">
+                    Not appropriate
+                  </p>
+                  <p className="mt-1 text-[12px] text-[#868e96]">
+                    Qualification set to Irrelevant
+                  </p>
+                  {notAppropriateReason ? (
+                    <p className="mt-1.5 text-[13px] leading-snug whitespace-pre-wrap text-[#495057]">
+                      {notAppropriateReason}
+                    </p>
+                  ) : null}
+                  {detail?.notAppropriateAt ? (
+                    <p className="mt-2 text-[11px] text-[#adb5bd]">
+                      {formatDateTimeLabel(detail.notAppropriateAt)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <section className="space-y-3">
                 <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">
@@ -339,6 +511,35 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
 
               <section className="space-y-3 border-t border-[rgba(33,37,41,0.05)] pt-4">
                 <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">
+                  First response
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="First client message"
+                    value={formatDateTimeLabel(detail?.firstClientMessageAt)}
+                  />
+                  <Field
+                    label="First agent message"
+                    value={formatDateTimeLabel(detail?.firstAgentMessageAt)}
+                  />
+                  <Field
+                    label="Response time"
+                    value={
+                      detail?.firstResponseMinutes != null
+                        ? formatFirstResponse(detail.firstResponseMinutes)
+                        : null
+                    }
+                  />
+                </div>
+                {detail?.firstResponseProofPath ? (
+                  <ProofThumb path={detail.firstResponseProofPath} />
+                ) : (
+                  <p className="text-[12px] text-[#adb5bd]">No screenshot proof</p>
+                )}
+              </section>
+
+              <section className="space-y-3 border-t border-[rgba(33,37,41,0.05)] pt-4">
+                <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">
                   Profile & notes
                 </p>
                 <Field label="Client profile" value={detail?.clientProfile} />
@@ -373,27 +574,113 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
         </div>
 
         <div className="shrink-0 border-t border-[rgba(33,37,41,0.06)] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={closeLeadPreview}
-              className={[
-                "lf-pressable h-9 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white text-[12px] font-medium text-[#495057] hover:bg-[#f8f9fa]",
-                allowProfileEdit ? "flex-1" : "w-full",
-              ].join(" ")}
-            >
-              Close
-            </button>
-            {allowProfileEdit ? (
+          {reasonOpen ? (
+            <div className="space-y-2.5">
+              <div>
+                <label
+                  htmlFor="lf-not-appropriate-reason"
+                  className="text-[11px] font-medium tracking-[0.06em] text-[#868e96] uppercase"
+                >
+                  Why not appropriate
+                </label>
+                <p className="mt-1 text-[11px] leading-snug text-[#adb5bd]">
+                  Submitting sets this lead to Irrelevant and adds a Not
+                  appropriate badge.
+                </p>
+                <textarea
+                  id="lf-not-appropriate-reason"
+                  ref={reasonRef}
+                  value={reason}
+                  onChange={(e) => {
+                    setReason(e.target.value);
+                    if (reasonError) setReasonError(null);
+                  }}
+                  rows={4}
+                  maxLength={REASON_MAX}
+                  disabled={reasonSubmitting}
+                  placeholder="Explain why this lead is not appropriate for sales…"
+                  className="mt-1.5 w-full resize-none rounded-lg border border-[rgba(33,37,41,0.1)] bg-white px-3 py-2 text-[13px] leading-snug text-[#212529] outline-none placeholder:text-[#adb5bd] focus:border-[rgba(33,37,41,0.28)] disabled:opacity-60"
+                />
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-[#adb5bd]">
+                    Min {REASON_MIN} characters
+                  </p>
+                  <p className="text-[11px] tabular-nums text-[#adb5bd]">
+                    {reason.trim().length}/{REASON_MAX}
+                  </p>
+                </div>
+                {reasonError ? (
+                  <p className="mt-1 text-[12px] text-[#c92a2a]">{reasonError}</p>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={reasonSubmitting}
+                  onClick={resetReasonForm}
+                  className="lf-pressable h-9 flex-1 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white text-[12px] font-medium text-[#495057] hover:bg-[#f8f9fa] disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={reasonSubmitting || reason.trim().length < REASON_MIN}
+                  onClick={() => void submitNotAppropriate()}
+                  className="lf-pressable inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#c92a2a] text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {reasonSubmitting ? (
+                    <>
+                      <LoaderCircle size={13} className="animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    "Submit"
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {allowNotAppropriate ? (
+                <button
+                  type="button"
+                  disabled={!canSubmitNotAppropriate || loading}
+                  onClick={() => {
+                    if (!canSubmitNotAppropriate) return;
+                    setReasonOpen(true);
+                    setReasonError(null);
+                  }}
+                  className={[
+                    "lf-pressable h-9 flex-1 rounded-lg border text-[12px] font-medium",
+                    isNotAppropriate
+                      ? "cursor-default border-[rgba(201,42,42,0.2)] bg-[#fff5f5] text-[#c92a2a]"
+                      : "border-[rgba(201,42,42,0.22)] bg-white text-[#c92a2a] hover:bg-[#fff5f5]",
+                  ].join(" ")}
+                >
+                  {isNotAppropriate ? "Marked" : "Not appropriate"}
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={() => onEdit(renderedId)}
-                className="lf-pressable h-9 flex-1 rounded-lg bg-[#212529] text-[12px] font-medium text-white hover:opacity-90"
+                onClick={closeLeadPreview}
+                className={[
+                  "lf-pressable h-9 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white text-[12px] font-medium text-[#495057] hover:bg-[#f8f9fa]",
+                  allowProfileEdit || allowNotAppropriate ? "flex-1" : "w-full",
+                ].join(" ")}
               >
-                Edit info
+                Close
               </button>
-            ) : null}
-          </div>
+              {allowProfileEdit ? (
+                <button
+                  type="button"
+                  onClick={() => onEdit(renderedId)}
+                  className="lf-pressable h-9 flex-1 rounded-lg bg-[#212529] text-[12px] font-medium text-white hover:opacity-90"
+                >
+                  Edit info
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
     </aside>

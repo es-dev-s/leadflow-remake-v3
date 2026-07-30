@@ -25,7 +25,11 @@ export const ALL_ROLE_OPTIONS: RoleOption[] = [
   { value: Role.Support, label: "Support" },
 ];
 
-const ATL_MANAGED: RoleId[] = [Role.LeadAnalyst, Role.MainTeamLead];
+const ATL_MANAGED: RoleId[] = [
+  Role.LeadAnalyst,
+  Role.MainTeamLead,
+  Role.SalesExecutive,
+];
 
 export function isSuperadmin(role: string | null | undefined) {
   return role === Role.Superadmin;
@@ -54,6 +58,16 @@ export function isSupport(role: string | null | undefined) {
 /** Who may see lead inventory, pipeline, transfers, and lead analytics. */
 export function canViewLeadData(role: string | null | undefined) {
   return !isSupport(role) && Boolean(role);
+}
+
+/** Operational KPI page — not for Sales Executives (assigned-inventory focus). */
+export function canViewKpi(role: string | null | undefined) {
+  return canViewLeadData(role) && !isSalesExecutive(role);
+}
+
+/** Superadmin may edit dynamic KPI targets / weightages. */
+export function canEditKpiTargets(role: string | null | undefined) {
+  return isSuperadmin(role);
 }
 
 export function canManageUsers(role: string | null | undefined) {
@@ -123,6 +137,7 @@ export function userManagementTabs(
     return [
       { id: Role.LeadAnalyst, label: "Lead Analysts" },
       { id: Role.MainTeamLead, label: "Main Team Leads" },
+      { id: Role.SalesExecutive, label: "Sales Executives" },
     ];
   }
   if (isMainTeamLead(actorRole)) {
@@ -199,6 +214,11 @@ export function canUpdateSalesOutcome(role: string | null | undefined) {
   return (
     isSuperadmin(role) || isAnalystTeamLead(role) || isSalesExecutive(role)
   );
+}
+
+/** Only Sales Executives may flag a lead as not appropriate. */
+export function canMarkNotAppropriate(role: string | null | undefined) {
+  return isSalesExecutive(role);
 }
 
 export function defaultCreateRole(

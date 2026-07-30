@@ -1,7 +1,11 @@
 import type { CreateLeadPayload } from "@/lib/lead-form-options";
 import type { LeadRecord } from "@/lib/leads-data";
 import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
-import { readQueryCache, writeQueryCache } from "@/lib/query-cache";
+import {
+  clearQueryCache,
+  readQueryCache,
+  writeQueryCache,
+} from "@/lib/query-cache";
 
 export const BACKEND_URL = (
   process.env.NEXT_PUBLIC_BACKEND_URL ?? ""
@@ -59,7 +63,10 @@ export async function apiFetch(
     const token = getAuthToken();
     if (token) nextHeaders.set("Authorization", `Bearer ${token}`);
   }
-  if (rest.body && !nextHeaders.has("Content-Type")) {
+  // Let the browser set multipart boundaries for FormData uploads.
+  const isFormData =
+    typeof FormData !== "undefined" && rest.body instanceof FormData;
+  if (rest.body && !isFormData && !nextHeaders.has("Content-Type")) {
     nextHeaders.set("Content-Type", "application/json");
   }
 
@@ -464,6 +471,11 @@ export type LeadDetail = {
   leadScore: number | null;
   createdAt: string;
   notes: string | null;
+  firstClientMessageAt?: string | null;
+  firstAgentMessageAt?: string | null;
+  /** Derived minutes between client and agent first messages. */
+  firstResponseMinutes?: number | null;
+  firstResponseProofPath?: string | null;
   salesStage?: string;
   salesStageLabel?: string;
   initialPayment?: number | null;
@@ -474,7 +486,34 @@ export type LeadDetail = {
   dealCurrency?: string;
   executiveNotes?: string | null;
   closed?: string;
+  notAppropriate?: boolean;
+  notAppropriateReason?: string | null;
+  notAppropriateAt?: string | null;
 };
+
+export type FirstResponseProofUpload = {
+  path: string;
+  filename: string;
+  mime: string;
+  size: number;
+};
+
+export async function uploadFirstResponseProof(
+  file: File,
+  signal?: AbortSignal,
+): Promise<FirstResponseProofUpload> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await apiFetch("/api/uploads/first-response-proof", {
+    method: "POST",
+    body,
+    signal,
+  });
+  if (!res.ok) {
+    throw await readApiError(res, `Failed to upload screenshot (${res.status})`);
+  }
+  return (await res.json()) as FirstResponseProofUpload;
+}
 
 export type SalesOutcomePayload = {
   salesStage?: string;
@@ -495,6 +534,32 @@ export async function updateLeadSalesOutcome(
   });
   if (!res.ok) {
     let message = `Failed to update sales outcome (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return (await res.json()) as LeadDetail;
+}
+
+export async function markLeadNotAppropriate(
+  id: string,
+  reason: string,
+  signal?: AbortSignal,
+): Promise<LeadDetail> {
+  const res = await apiFetch(`/api/leads/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      notAppropriate: true,
+      notAppropriateReason: reason,
+    }),
+    signal,
+  });
+  if (!res.ok) {
+    let message = `Failed to mark lead as not appropriate (${res.status})`;
     try {
       const body = (await res.json()) as { error?: string };
       if (body.error) message = body.error;
@@ -666,6 +731,124 @@ export async function fetchLeadsSummary(
     params.signal,
     "Failed to load leads summary",
   );
+}
+
+export type KpiItem = {
+  id: string;
+  label: string;
+  description: string;
+  formula?: string;
+  available: boolean;
+  unavailableReason?: string;
+  numerator?: number;
+  denominator?: number;
+  rate?: number;
+  value?: number;
+  unit?: string;
+  direction?: "higher_better" | "lower_better" | "info" | string;
+  targetValue?: number | null;
+  benchmarkValue?: number | null;
+  teamWeight?: number | null;
+  supervisorWeight?: number | null;
+  teamAligned?: boolean;
+  supervisorAligned?: boolean;
+  metTarget?: boolean | null;
+  metBenchmark?: boolean | null;
+};
+
+export type KpiSnapshot = {
+  items: KpiItem[];
+  notAppropriateCount?: number;
+};
+
+export type KpiTargetConfig = {
+  key: string;
+  label: string;
+  description: string;
+  formula?: string;
+  unit: string;
+  direction: string;
+  targetValue: number | null;
+  benchmarkValue: number | null;
+  teamWeight: number | null;
+  supervisorWeight: number | null;
+  teamAligned: boolean;
+  supervisorAligned: boolean;
+  sortOrder: number;
+  updatedAt: string;
+};
+
+export async function fetchKPI(
+  params: {
+    country?: string;
+    city?: string;
+    filter?: string;
+    teamId?: string;
+    analystId?: string;
+    salesExecId?: string;
+    managerId?: string;
+    source?: string;
+    portal?: string;
+    status?: string;
+    stage?: string;
+    addedFrom?: string;
+    addedTo?: string;
+    signal?: AbortSignal;
+  } = {},
+): Promise<KpiSnapshot> {
+  const sp = new URLSearchParams();
+  if (params.country) sp.set("country", params.country);
+  if (params.city) sp.set("city", params.city);
+  if (params.filter && params.filter !== "all") sp.set("filter", params.filter);
+  if (params.teamId) sp.set("teamId", params.teamId);
+  if (params.analystId) sp.set("analystId", params.analystId);
+  if (params.salesExecId) sp.set("salesExecId", params.salesExecId);
+  if (params.managerId) sp.set("managerId", params.managerId);
+  if (params.source) sp.set("source", params.source);
+  if (params.portal) sp.set("portal", params.portal);
+  if (params.status) sp.set("status", params.status);
+  if (params.stage) sp.set("stage", params.stage);
+  if (params.addedFrom) sp.set("addedFrom", params.addedFrom);
+  if (params.addedTo) sp.set("addedTo", params.addedTo);
+  const qs = sp.toString();
+  return getJSONCached<KpiSnapshot>(
+    `/api/kpi${qs ? `?${qs}` : ""}`,
+    15_000,
+    params.signal,
+    "Failed to load KPI",
+  );
+}
+
+export async function fetchKpiTargets(
+  signal?: AbortSignal,
+): Promise<KpiTargetConfig[]> {
+  const res = await apiFetch("/api/kpi/targets", { method: "GET", signal });
+  if (!res.ok) {
+    throw await readApiError(res, "Failed to load KPI targets");
+  }
+  const data = (await res.json()) as { items?: KpiTargetConfig[] };
+  return data.items ?? [];
+}
+
+export async function updateKpiTargets(
+  items: Array<{
+    key: string;
+    targetValue: number | null;
+    benchmarkValue: number | null;
+    teamWeight: number | null;
+    supervisorWeight: number | null;
+  }>,
+): Promise<KpiTargetConfig[]> {
+  const res = await apiFetch("/api/kpi/targets", {
+    method: "PUT",
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) {
+    throw await readApiError(res, "Failed to update KPI targets");
+  }
+  clearQueryCache();
+  const data = (await res.json()) as { items?: KpiTargetConfig[] };
+  return data.items ?? [];
 }
 
 export type PipelineSummary = {
