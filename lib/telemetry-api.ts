@@ -1,6 +1,6 @@
-import { getAuthToken } from "@/lib/auth-token";
+import { hasSessionMarker } from "@/lib/auth-token";
 
-/** Same-origin proxy to the isolated telemetry service (:8081). */
+/** Same-origin proxy to the isolated telemetry service (:9081). */
 export const TELEMETRY_BASE = (
   process.env.NEXT_PUBLIC_TELEMETRY_URL ?? "/telemetry"
 ).replace(/\/$/, "");
@@ -89,14 +89,13 @@ async function telemetryFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const headers = new Headers(init.headers);
-  const token = getAuthToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
   return fetch(`${TELEMETRY_BASE}${path}`, {
     ...init,
     headers,
+    credentials: "include",
     cache: "no-store",
   });
 }
@@ -104,16 +103,15 @@ async function telemetryFetch(
 /** Fire-and-forget client beacon — never throws into UI flows. */
 export function emitTelemetry(events: IngestEvent | IngestEvent[]) {
   if (typeof window === "undefined") return;
+  if (!hasSessionMarker()) return;
   const list = Array.isArray(events) ? events : [events];
   if (list.length === 0) return;
-  const token = getAuthToken();
-  if (!token) return;
   void fetch(`${TELEMETRY_BASE}/v1/ingest`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
+    credentials: "include",
     body: JSON.stringify({
       events: list.map((e) => ({
         source: e.source ?? "ui",
@@ -128,7 +126,7 @@ export function emitTelemetry(events: IngestEvent | IngestEvent[]) {
 }
 
 export function emitHttpStatus(status: number, path: string, method = "GET") {
-  if (status === 401) return; // auth noise
+  if (status === 401) return;
   emitTelemetry({
     kind: "http_status",
     severity: status >= 500 ? "error" : "warn",

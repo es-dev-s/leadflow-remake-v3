@@ -4,7 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, fetchMe } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth-token";
+import { COOKIE_SESSION, getAuthToken } from "@/lib/auth-token";
 import { readCachedUser, writeCachedUser } from "@/lib/auth-user-cache";
 import { isAbortError } from "@/lib/reset-client-state";
 import { useAuthStore } from "@/store/auth-store";
@@ -15,26 +15,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const bootstrapped = useAuthStore((s) => s.bootstrapped);
   const hydrateToken = useAuthStore((s) => s.hydrateToken);
+  const setSession = useAuthStore((s) => s.setSession);
   const setUser = useAuthStore((s) => s.setUser);
   const clearSession = useAuthStore((s) => s.clearSession);
   const markBootstrapped = useAuthStore((s) => s.markBootstrapped);
   const [ready, setReady] = useState(() => Boolean(useAuthStore.getState().user));
 
   useEffect(() => {
-    const existing = hydrateToken();
-    if (!existing) {
-      writeCachedUser(null);
-      markBootstrapped();
-      router.replace("/login");
-      return;
-    }
+    hydrateToken();
 
-    // Instant shell: restore last known user so we never flash the full loader.
+    // Instant shell from cached user while /me validates the HttpOnly cookie.
     let hadUser = Boolean(useAuthStore.getState().user);
     if (!hadUser) {
       const cached = readCachedUser();
       if (cached) {
         setUser(cached);
+        useAuthStore.setState({ token: COOKIE_SESSION });
         hadUser = true;
       }
     }
@@ -45,31 +41,29 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 10000);
+    const sessionAtStart = getAuthToken();
 
     void fetchMe(controller.signal)
       .then((me) => {
         if (controller.signal.aborted) return;
-        if (getAuthToken() !== existing) return;
-        writeCachedUser(me);
-        setUser(me);
+        setSession(COOKIE_SESSION, "", me);
         markBootstrapped();
         setReady(true);
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || isAbortError(err)) {
+          // Abort on unmount must not clear a valid cookie session.
           if (useAuthStore.getState().user) {
             markBootstrapped();
             setReady(true);
-            return;
           }
-          if (getAuthToken() !== existing) return;
-          markBootstrapped();
-          writeCachedUser(null);
-          clearSession();
-          router.replace("/login");
           return;
         }
-        if (getAuthToken() !== existing) return;
+
+        // Another login may have started; don't wipe a newer session.
+        if (getAuthToken() && getAuthToken() !== sessionAtStart && sessionAtStart) {
+          return;
+        }
 
         const isUnauthorized =
           err instanceof ApiError && err.status === 401;
@@ -95,13 +89,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [
     hydrateToken,
+    setSession,
     setUser,
     clearSession,
     markBootstrapped,
     router,
   ]);
 
-  // Only block the whole shell when we have nothing to show yet.
   if (!bootstrapped || !token || !user || !ready) {
     return (
       <div className="flex h-dvh items-center justify-center bg-[#f8f9fa]">

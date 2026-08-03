@@ -20,6 +20,7 @@ import {
   ApiError,
   deleteUserRequest,
   fetchUsers,
+  setUserActiveRequest,
   type PublicUser,
 } from "@/lib/api";
 import {
@@ -106,8 +107,33 @@ export function UsersContent() {
     Record<string, true>
   >({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
   const deleteEpochRef = useRef(0);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function toggleUserActive(user: PublicUser) {
+    if (togglingActiveId || currentUser?.id === user.id) return;
+    const next = !(user.isActive !== false);
+    setTogglingActiveId(user.id);
+    setActionError(null);
+    try {
+      const updated = await setUserActiveRequest(user.id, next);
+      setUsers((prev) =>
+        prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)),
+      );
+      setActionNotice(
+        next
+          ? `${updated.name} is active again`
+          : `${updated.name} is inactive and cannot log in`,
+      );
+    } catch (err: unknown) {
+      setActionError(
+        err instanceof Error ? err.message : "Failed to update account status",
+      );
+    } finally {
+      setTogglingActiveId(null);
+    }
+  }
 
   useEffect(() => {
     if (!tabs.length) return;
@@ -464,6 +490,9 @@ export function UsersContent() {
                 <th className="px-2 py-2.5 font-medium">Role</th>
                 <th className="px-2 py-2.5 font-medium">Team</th>
                 <th className="px-2 py-2.5 font-medium">Session</th>
+                {canManage ? (
+                  <th className="px-2 py-2.5 font-medium">Account</th>
+                ) : null}
                 <th className="px-2 py-2.5 font-medium">Password</th>
                 <th className="px-2 py-2.5 text-right font-medium">Joined</th>
                 {canManage ? (
@@ -478,13 +507,18 @@ export function UsersContent() {
                 const issued = issuedPasswords[user.id];
                 const revealed = Boolean(revealedPasswordIds[user.id]);
                 const isSelf = currentUser?.id === user.id;
+                const accountActive = user.isActive !== false;
                 const canAct =
                   canManage &&
                   canActOnUserRole(currentUser?.role, user.role);
+                const toggling = togglingActiveId === user.id;
                 return (
                   <tr
                     key={user.id}
-                    className="border-b border-[rgba(33,37,41,0.04)] bg-white last:border-b-0 hover:bg-[#fafbfc]"
+                    className={[
+                      "border-b border-[rgba(33,37,41,0.04)] last:border-b-0 hover:bg-[#fafbfc]",
+                      accountActive ? "bg-white" : "bg-[#fafafa]",
+                    ].join(" ")}
                   >
                     <td className="px-3.5 py-2.5 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
                       {String(index + 1).padStart(2, "0")}
@@ -495,11 +529,23 @@ export function UsersContent() {
                           {initials(user.name)}
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-[13px] font-medium text-[#212529]">
+                          <p
+                            className={[
+                              "truncate text-[13px] font-medium",
+                              accountActive
+                                ? "text-[#212529]"
+                                : "text-[#868e96]",
+                            ].join(" ")}
+                          >
                             {user.name}
                             {isSelf ? (
                               <span className="ml-1.5 text-[10px] font-medium text-[#868e96]">
                                 you
+                              </span>
+                            ) : null}
+                            {!accountActive ? (
+                              <span className="ml-1.5 text-[10px] font-medium text-[#adb5bd]">
+                                inactive
                               </span>
                             ) : null}
                           </p>
@@ -544,6 +590,69 @@ export function UsersContent() {
                         </span>
                       </span>
                     </td>
+                    {canManage ? (
+                      <td className="px-2 py-2.5">
+                        {canAct ? (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={accountActive}
+                            aria-label={
+                              accountActive
+                                ? `Deactivate ${user.name}`
+                                : `Activate ${user.name}`
+                            }
+                            disabled={isSelf || toggling}
+                            title={
+                              isSelf
+                                ? "You cannot deactivate your own account"
+                                : accountActive
+                                  ? "Active — click to set inactive (cannot log in)"
+                                  : "Inactive — click to reactivate"
+                            }
+                            onClick={() => void toggleUserActive(user)}
+                            className={[
+                              "lf-pressable group inline-flex items-center gap-2 rounded-full py-1 pr-2.5 pl-1 transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                              accountActive
+                                ? "bg-[#ebfbee] hover:bg-[#d3f9d8]"
+                                : "bg-[#f1f3f5] hover:bg-[#e9ecef]",
+                            ].join(" ")}
+                          >
+                            <span
+                              className={[
+                                "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+                                accountActive ? "bg-[#2f9e44]" : "bg-[#ced4da]",
+                              ].join(" ")}
+                            >
+                              <span
+                                className={[
+                                  "absolute h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                  accountActive
+                                    ? "translate-x-[18px]"
+                                    : "translate-x-0.5",
+                                ].join(" ")}
+                              />
+                            </span>
+                            <span
+                              className={[
+                                "text-[11px] font-medium",
+                                accountActive
+                                  ? "text-[#2b8a3e]"
+                                  : "text-[#868e96]",
+                              ].join(" ")}
+                            >
+                              {toggling
+                                ? "…"
+                                : accountActive
+                                  ? "Active"
+                                  : "Inactive"}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-[#adb5bd]">—</span>
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-2 py-2.5">
                       {issued ? (
                         <div className="flex min-w-[160px] flex-col gap-1">

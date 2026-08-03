@@ -365,11 +365,36 @@ function isPlausibleNationalRest(dial: string, restLen: number): boolean {
 }
 
 /**
+ * Insert a single space between a recognized country dial code and the
+ * national number: "+977 9812345678". Keeps a trailing space once the dial
+ * is known so typing the local digits feels natural.
+ */
+export function formatPhoneWithDialSpace(
+  phone: string,
+  countryHint = "",
+): string {
+  let digits = phoneDigits(phone);
+  if (!digits) return "+";
+  digits = stripIntlExitPrefix(digits);
+
+  const matched =
+    matchCountryFromPhone(`+${digits}`, countryHint) ??
+    findCountryByName(countryHint);
+
+  if (matched && digits.startsWith(matched.dial)) {
+    const rest = digits.slice(matched.dial.length);
+    return rest ? `+${matched.dial} ${rest}` : `+${matched.dial} `;
+  }
+
+  return `+${digits}`;
+}
+
+/**
  * Live typing / paste normalization.
  * Always keeps a leading +, converts 00… / 011… exit prefixes, and
- * preserves light formatting.
+ * inserts a space after the country dial code when recognized.
  */
-export function normalizePhoneInput(raw: string): string {
+export function normalizePhoneInput(raw: string, countryHint = ""): string {
   const trimmed = raw.trim();
   if (!trimmed) return "+";
 
@@ -383,7 +408,7 @@ export function normalizePhoneInput(raw: string): string {
     digits = stripIntlExitPrefix(digits);
   }
 
-  return `+${digits}`;
+  return formatPhoneWithDialSpace(`+${digits}`, countryHint);
 }
 
 /**
@@ -412,7 +437,7 @@ export function normalizeStoredPhone(
   });
   if (matched) {
     digits = stripTrunkZeroAfterDial(digits, matched.dial);
-    return `+${digits}`;
+    return formatPhoneWithDialSpace(`+${digits}`, countryHint);
   }
 
   // Local / national number with a known country on the lead.
@@ -421,12 +446,12 @@ export function normalizeStoredPhone(
     if (national.startsWith("0")) national = national.replace(/^0+/, "");
     if (national.startsWith(hinted.dial)) {
       digits = stripTrunkZeroAfterDial(national, hinted.dial);
-      return `+${digits}`;
+      return formatPhoneWithDialSpace(`+${digits}`, countryHint);
     }
-    return `+${hinted.dial}${national}`;
+    return formatPhoneWithDialSpace(`+${hinted.dial}${national}`, countryHint);
   }
 
-  return `+${digits}`;
+  return formatPhoneWithDialSpace(`+${digits}`, countryHint);
 }
 
 export function ensurePhonePrefix(
@@ -526,15 +551,15 @@ export function applyCountryToPhone(
   });
   if (matched) {
     let rest = digits.slice(matched.dial.length).replace(/^0+/, "");
-    return `+${country.dial}${rest}`;
+    return formatPhoneWithDialSpace(`+${country.dial}${rest}`, countryName);
   }
 
   let national = digits.replace(/^0+/, "");
-  if (!national) return `+${country.dial}`;
+  if (!national) return formatPhoneWithDialSpace(`+${country.dial}`, countryName);
   if (national.startsWith(country.dial)) {
     national = national.slice(country.dial.length).replace(/^0+/, "");
   }
-  return `+${country.dial}${national}`;
+  return formatPhoneWithDialSpace(`+${country.dial}${national}`, countryName);
 }
 
 export function countrySelectOptions(): { value: string; label: string }[] {
@@ -549,4 +574,18 @@ export function countrySelectOptions(): { value: string; label: string }[] {
 export function isMeaningfulPhone(phone: string): boolean {
   const digits = phoneDigits(phone);
   return digits.length >= 5;
+}
+
+/** True when dial code is known and national digits look complete enough to look up. */
+export function isCompletePhoneNumber(
+  phone: string,
+  countryHint = "",
+): boolean {
+  if (!isMeaningfulPhone(phone)) return false;
+  let digits = phoneDigits(phone);
+  digits = stripIntlExitPrefix(digits);
+  const matched = matchCountryFromPhone(`+${digits}`, countryHint);
+  if (!matched || !digits.startsWith(matched.dial)) return false;
+  const restLen = digits.length - matched.dial.length;
+  return isPlausibleNationalRest(matched.dial, restLen);
 }

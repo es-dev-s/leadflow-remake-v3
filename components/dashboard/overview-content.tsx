@@ -25,6 +25,7 @@ import {
   canViewLeadData,
   isAnalyticsScoped,
   isAssigneeScoped,
+  isSuperadmin,
   isTeamScoped,
 } from "@/lib/roles";
 import {
@@ -38,6 +39,15 @@ function formatCount(value: number | undefined) {
   return value.toLocaleString("en-US");
 }
 
+function formatRevenue(value: number | undefined) {
+  if (value == null) return "—";
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+  });
+}
+
 export function OverviewContent() {
   const navigateToLeads = useNavigateToLeads();
   const scrollRef = usePersistedOverviewScroll();
@@ -45,6 +55,7 @@ export function OverviewContent() {
   const analyticsScoped = isAnalyticsScoped(role);
   const assigneeScoped = isAssigneeScoped(role);
   const teamScoped = isTeamScoped(role);
+  const superadmin = isSuperadmin(role);
   const hideCrossTeam = analyticsScoped || teamScoped;
   const [summary, setSummary] = useState<LeadSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -197,8 +208,19 @@ export function OverviewContent() {
   const secondary: Array<{
     label: string;
     value: string;
+    detail?: string;
     link: LeadsDeepLink;
   }> = [
+    ...(superadmin
+      ? [
+          {
+            label: "Total revenue",
+            value: formatRevenue(summary?.closedRevenue),
+            detail: "Closed-won deal value (AUD)",
+            link: { filter: "converted" as const },
+          },
+        ]
+      : []),
     {
       label: "Total won",
       value: formatCount(summary?.totalWon),
@@ -268,6 +290,7 @@ export function OverviewContent() {
               key={card.label}
               label={card.label}
               value={card.value}
+              detail={card.detail}
               onClick={() => open(card.link)}
             />
           ))}

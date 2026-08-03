@@ -809,8 +809,8 @@ function SelectionBar({
   const open = selectedCount > 0;
 
   const assignBtnRef = useRef<HTMLButtonElement>(null);
+  const dockBarRef = useRef<HTMLDivElement>(null);
   const [assignOpen, setAssignOpen] = useState(false);
-  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const {
     phase: deletePhase,
@@ -847,12 +847,10 @@ function SelectionBar({
     }
   }, [open, resetDelete]);
 
-  function openAssign() {
+  function toggleAssign() {
     if (assignBlocked) return;
     setDeleteOpen(false);
-    const rect = assignBtnRef.current?.getBoundingClientRect() ?? null;
-    setAnchorRect(rect);
-    setAssignOpen(true);
+    setAssignOpen((prev) => !prev);
   }
 
   async function confirmDelete() {
@@ -891,27 +889,29 @@ function SelectionBar({
         aria-hidden={!open}
       >
         <div
+          ref={dockBarRef}
           className={[
-            "flex max-w-[min(100%,36rem)] flex-wrap items-center justify-center gap-1 rounded-xl border border-[rgba(33,37,41,0.1)] bg-white px-2 py-1.5 shadow-[0_10px_28px_rgba(33,37,41,0.1)]",
+            "flex max-w-[min(100%,36rem)] flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-white/10 bg-[#1c1f24]/95 px-1.5 py-1.5 text-white shadow-[0_18px_48px_rgba(15,17,20,0.28)] backdrop-blur-xl",
             open ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
         >
-          <span className="rounded-lg bg-[#f8f9fa] px-2.5 py-1.5 text-[12px] font-medium tabular-nums text-[#212529]">
+          <span className="rounded-xl bg-[#e86812] px-2.5 py-1.5 text-[12px] font-semibold tabular-nums tracking-tight text-white">
             {selectedCount} Selected
           </span>
-          <span className="mx-0.5 h-4 w-px bg-[rgba(33,37,41,0.08)]" />
+          <span className="mx-0.5 h-4 w-px bg-white/12" />
           {allowAssign ? (
             <button
               ref={assignBtnRef}
               type="button"
-              onClick={openAssign}
+              onClick={toggleAssign}
               disabled={assignBlocked}
               title={assignBlockedReason}
               aria-expanded={assignOpen}
               aria-haspopup="dialog"
+              data-assign-trigger="true"
               className={[
-                "lf-pressable rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-[#212529] hover:bg-[#f8f9fa] disabled:cursor-not-allowed disabled:text-[#adb5bd] disabled:hover:bg-transparent",
-                assignOpen ? "bg-[#f8f9fa]" : "",
+                "lf-pressable rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/35 disabled:hover:bg-transparent",
+                assignOpen ? "bg-white/14 text-white" : "",
               ].join(" ")}
             >
               Assign
@@ -931,7 +931,7 @@ function SelectionBar({
                 setAssignOpen(false);
                 onEditLead(leadIds[0]);
               }}
-              className="lf-pressable rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-[#212529] hover:bg-[#f8f9fa] disabled:text-[#adb5bd] disabled:hover:bg-transparent"
+              className="lf-pressable rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-white/90 hover:bg-white/10 disabled:text-white/35 disabled:hover:bg-transparent"
             >
               Edit Info
             </button>
@@ -945,9 +945,9 @@ function SelectionBar({
                 setDeleteError(null);
                 setDeleteOpen(true);
               }}
-              className="lf-pressable inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-[#212529] hover:bg-[#f8f9fa] disabled:opacity-60"
+              className="lf-pressable inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-[#ffc9c9] hover:bg-[rgba(255,107,107,0.14)] disabled:opacity-60"
             >
-              <Trash2 size={12} strokeWidth={1.5} className="text-[#6c757d]" />
+              <Trash2 size={12} strokeWidth={1.5} className="text-[#ffa8a8]" />
               Delete
             </button>
           ) : null}
@@ -959,16 +959,17 @@ function SelectionBar({
               });
             }}
             aria-label="Clear selection"
-            className="lf-pressable ml-0.5 flex h-7 w-7 items-center justify-center rounded-lg text-[#6c757d] hover:bg-[#f8f9fa] hover:text-[#212529]"
+            className="lf-pressable ml-0.5 flex h-8 w-8 items-center justify-center rounded-xl text-white/50 hover:bg-white/10 hover:text-white"
           >
-            <X size={13} strokeWidth={1.5} />
+            <X size={14} strokeWidth={1.75} />
           </button>
         </div>
       </div>
 
       <AssignLeadsPopover
         open={allowAssign && assignOpen}
-        anchorRect={anchorRect}
+        dockEl={dockBarRef.current}
+        triggerEl={assignBtnRef.current}
         leadIds={leadIds}
         membersOnly={assignMembersOnly}
         onClose={() => setAssignOpen(false)}

@@ -31,6 +31,14 @@ type Props = {
   disabled?: boolean;
   required?: boolean;
   searchable?: boolean;
+  /** Highlight the trigger as a validation / duplicate conflict. */
+  invalid?: boolean;
+  /**
+   * Soft-highlight options already used with the looked-up phone number.
+   * Also tints the trigger when the current value is in this set.
+   */
+  markedValues?: string[];
+  markedHint?: string;
   onChange: (value: string) => void;
   className?: string;
 };
@@ -43,6 +51,9 @@ export function ScreenAwareSelect({
   disabled = false,
   required = false,
   searchable = false,
+  invalid = false,
+  markedValues,
+  markedHint = "On file",
   onChange,
   className = "",
 }: Props) {
@@ -74,15 +85,40 @@ export function ScreenAwareSelect({
     [options, value],
   );
 
+  // Case-insensitive so DB values still mark the matching option.
+  const markedSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const v of markedValues ?? []) {
+      const t = v.trim().toLowerCase();
+      if (t) set.add(t);
+    }
+    return set;
+  }, [markedValues]);
+
+  const isMarked = useCallback(
+    (v: string) => Boolean(v && markedSet.has(v.trim().toLowerCase())),
+    [markedSet],
+  );
+
+  const valueMarked = isMarked(value);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        item.value.toLowerCase().includes(q),
-    );
-  }, [options, query]);
+    const list = !q
+      ? options
+      : options.filter(
+          (item) =>
+            item.label.toLowerCase().includes(q) ||
+            item.value.toLowerCase().includes(q),
+        );
+    // Surface on-file options first so the marks are easy to spot.
+    if (markedSet.size === 0) return list;
+    return [...list].sort((a, b) => {
+      const am = markedSet.has(a.value.trim().toLowerCase()) ? 0 : 1;
+      const bm = markedSet.has(b.value.trim().toLowerCase()) ? 0 : 1;
+      return am - bm;
+    });
+  }, [options, query, markedSet]);
 
   const updatePos = useCallback(() => {
     const trigger = triggerRef.current;
@@ -204,9 +240,13 @@ export function ScreenAwareSelect({
           "lf-pressable flex h-11 w-full items-center justify-between gap-2 rounded-xl border px-3.5 text-left text-[13px] outline-none transition-[border-color,box-shadow,background-color]",
           disabled
             ? "cursor-not-allowed border-[rgba(33,37,41,0.06)] bg-[#f8f9fa] text-[#adb5bd]"
-            : open
-              ? "border-[rgba(232,104,18,0.45)] bg-white shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
-              : "border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] hover:border-[rgba(33,37,41,0.16)]",
+            : invalid
+              ? "border-[rgba(201,42,42,0.45)] bg-white shadow-[0_0_0_3px_rgba(201,42,42,0.1)]"
+              : valueMarked
+                ? "border-[rgba(232,104,18,0.35)] bg-[#fff7ef]"
+                : open
+                  ? "border-[rgba(232,104,18,0.45)] bg-white shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
+                  : "border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] hover:border-[rgba(33,37,41,0.16)]",
         ].join(" ")}
       >
         <span
@@ -216,13 +256,20 @@ export function ScreenAwareSelect({
         >
           {selected?.label ?? placeholder}
         </span>
-        <ChevronDown
-          size={15}
-          strokeWidth={1.75}
-          className={`shrink-0 text-[#adb5bd] transition-transform duration-150 ${
-            open ? "rotate-180 text-[#e86812]" : ""
-          }`}
-        />
+        <span className="flex shrink-0 items-center gap-1.5">
+          {valueMarked ? (
+            <span className="rounded-md bg-[rgba(232,104,18,0.16)] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#9a3f00] uppercase">
+              {markedHint}
+            </span>
+          ) : null}
+          <ChevronDown
+            size={15}
+            strokeWidth={1.75}
+            className={`text-[#adb5bd] transition-transform duration-150 ${
+              open ? "rotate-180 text-[#e86812]" : ""
+            }`}
+          />
+        </span>
       </button>
 
       {mounted && open && pos
@@ -282,31 +329,42 @@ export function ScreenAwareSelect({
                 ) : (
                   filtered.map((option) => {
                     const active = option.value === value;
+                    const marked = isMarked(option.value);
                     return (
                       <button
                         key={option.value}
                         type="button"
                         role="option"
                         aria-selected={active}
+                        data-marked={marked || undefined}
                         onClick={() => {
                           onChange(option.value);
                           close();
                         }}
                         className={[
                           "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-[13px] transition-colors",
-                          active
-                            ? "bg-[#fff7ef] font-medium text-[#9a3f00]"
-                            : "text-[#212529] hover:bg-[#f8f9fa]",
+                          marked
+                            ? "border-l-2 border-l-[#e86812] bg-[#fff7ef] font-medium text-[#9a3f00] hover:bg-[#ffefd9]"
+                            : active
+                              ? "bg-[#fff7ef] font-medium text-[#9a3f00]"
+                              : "text-[#212529] hover:bg-[#f8f9fa]",
                         ].join(" ")}
                       >
                         <span className="min-w-0 truncate">{option.label}</span>
-                        {active ? (
-                          <Check
-                            size={14}
-                            strokeWidth={2}
-                            className="shrink-0 text-[#e86812]"
-                          />
-                        ) : null}
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {marked ? (
+                            <span className="rounded-md bg-[rgba(232,104,18,0.16)] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#9a3f00] uppercase">
+                              {markedHint}
+                            </span>
+                          ) : null}
+                          {active ? (
+                            <Check
+                              size={14}
+                              strokeWidth={2}
+                              className="text-[#e86812]"
+                            />
+                          ) : null}
+                        </span>
                       </button>
                     );
                   })

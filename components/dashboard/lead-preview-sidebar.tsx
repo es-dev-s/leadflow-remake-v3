@@ -16,7 +16,6 @@ import {
   markLeadNotAppropriate,
   type LeadDetail,
 } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth-token";
 import { leadDetailToListPatch } from "@/lib/lead-record-map";
 import {
   canEditLeadProfile,
@@ -66,10 +65,9 @@ function ProofThumb({ path }: { path: string }) {
   useEffect(() => {
     let revoked: string | null = null;
     const controller = new AbortController();
-    const token = getAuthToken();
     const url = path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
     void fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      credentials: "include",
       signal: controller.signal,
       cache: "no-store",
     })

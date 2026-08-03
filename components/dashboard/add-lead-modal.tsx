@@ -25,6 +25,7 @@ import {
   ensurePhonePrefix,
   flagEmoji,
   findCountryByName,
+  isCompletePhoneNumber,
   isMeaningfulPhone,
   matchCountryFromPhone,
   normalizePhoneInput,
@@ -234,7 +235,7 @@ function formFromDetail(detail: LeadDetail): FormState {
   };
 }
 
-const portalOptions = [
+const BASE_PORTAL_OPTIONS = [
   ...PORTAL_WEBSITES.map((portal) => ({ value: portal, label: portal })),
   { value: PORTAL_OTHER, label: PORTAL_OTHER },
 ];
@@ -258,8 +259,20 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     isBusy: submitting,
   } = useActionPhase();
   const [error, setError] = useState<string | null>(null);
-  const [duplicateTeam, setDuplicateTeam] = useState<string | null>(null);
-  const [duplicateChecking, setDuplicateChecking] = useState(false);
+  /** Team that already owns this phone (informational). */
+  const [phoneTeam, setPhoneTeam] = useState<string | null>(null);
+  const [phoneExists, setPhoneExists] = useState(false);
+  /** Portals/sources already used with this phone on the platform. */
+  const [existingPortals, setExistingPortals] = useState<string[]>([]);
+  const [existingSources, setExistingSources] = useState<string[]>([]);
+  const [phoneChecking, setPhoneChecking] = useState(false);
+
+  function clearPhonePresence() {
+    setPhoneTeam(null);
+    setPhoneExists(false);
+    setExistingPortals([]);
+    setExistingSources([]);
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -269,7 +282,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     if (open) {
       setPresent(true);
       setError(null);
-      setDuplicateTeam(null);
+      clearPhonePresence();
       resetSubmit();
       const frame = requestAnimationFrame(() => {
         requestAnimationFrame(() => setEntered(true));
@@ -288,14 +301,14 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     if (!leadId) {
       setForm(emptyForm());
       setLoading(false);
-      setDuplicateTeam(null);
+      clearPhonePresence();
       return;
     }
 
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    setDuplicateTeam(null);
+    clearPhonePresence();
     void fetchLead(leadId, controller.signal)
       .then((detail) => {
         if (controller.signal.aborted) return;
@@ -328,20 +341,86 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   }, [present, open, onClose, submitting]);
 
   const portalIsOther = form.portalSelect === PORTAL_OTHER;
+  const portalWebsiteValue = portalIsOther
+    ? form.portalOther.trim()
+    : form.portalSelect.trim();
+  const portalOptions = useMemo(() => {
+    const known = new Set<string>([
+      ...PORTAL_WEBSITES,
+      PORTAL_OTHER,
+      ...BASE_PORTAL_OPTIONS.map((o) => o.value),
+    ]);
+    const extras = existingPortals
+      .filter((p) => p && !known.has(p) && p !== form.portalOther.trim())
+      .map((p) => ({ value: p, label: p }));
+    if (
+      form.portalSelect &&
+      form.portalSelect !== PORTAL_OTHER &&
+      !known.has(form.portalSelect) &&
+      !extras.some((e) => e.value === form.portalSelect)
+    ) {
+      extras.unshift({
+        value: form.portalSelect,
+        label: form.portalSelect,
+      });
+    }
+    return [...extras, ...BASE_PORTAL_OPTIONS];
+  }, [existingPortals, form.portalSelect, form.portalOther]);
+
+  const markedPortalValues = useMemo(() => {
+    const marked = new Set<string>();
+    const knownByLower = new Map(
+      PORTAL_WEBSITES.map((p) => [p.toLowerCase(), p] as const),
+    );
+    for (const p of existingPortals) {
+      const t = p.trim();
+      if (!t) continue;
+      const known = knownByLower.get(t.toLowerCase());
+      if (known) {
+        marked.add(known);
+      } else {
+        // Custom / free-text portals map to the Other option + exact value.
+        marked.add(PORTAL_OTHER);
+        marked.add(t);
+      }
+    }
+    return [...marked];
+  }, [existingPortals]);
+
+  const markedSourceValues = useMemo(() => {
+    const marked = new Set<string>();
+    const knownByLower = new Map(
+      LEAD_SOURCES.map((s) => [s.toLowerCase(), s] as const),
+    );
+    for (const s of existingSources) {
+      const t = s.trim();
+      if (!t) continue;
+      marked.add(knownByLower.get(t.toLowerCase()) ?? t);
+    }
+    return [...marked];
+  }, [existingSources]);
 
   const sourceOptions = useMemo(() => {
     const base = LEAD_SOURCES.map((source) => ({
       value: source,
       label: source,
     }));
+    const extras: { value: string; label: string }[] = [];
+    const seen = new Set<string>(LEAD_SOURCES);
+    for (const s of existingSources) {
+      if (s && !seen.has(s)) {
+        seen.add(s);
+        extras.push({ value: s, label: s });
+      }
+    }
     if (
       form.source &&
-      !LEAD_SOURCES.includes(form.source as (typeof LEAD_SOURCES)[number])
+      !seen.has(form.source)
     ) {
-      return [{ value: form.source, label: form.source }, ...base];
+      extras.unshift({ value: form.source, label: form.source });
     }
-    return base;
-  }, [form.source]);
+    return [...extras, ...base];
+  }, [form.source, existingSources]);
 
   const qualificationOptions = useMemo(() => {
     const known = new Set(
@@ -370,28 +449,28 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     [form.country],
   );
 
-  // Live duplicate check by phone and/or email.
+  // When the phone looks complete, look up team + portals/sources already on file.
+  // Indicators only — never blocks create/update.
   useEffect(() => {
     if (!open || loading) return;
 
-    const email = form.email.trim();
-    const phoneReady = isMeaningfulPhone(form.phone);
-    if (!email && !phoneReady) {
-      setDuplicateTeam(null);
-      setDuplicateChecking(false);
+    const complete = isCompletePhoneNumber(form.phone, form.country);
+    if (!complete) {
+      clearPhonePresence();
+      setPhoneChecking(false);
       return;
     }
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      setDuplicateChecking(true);
-      const phone = phoneReady
-        ? normalizeStoredPhone(form.phone, form.country).replace(/\s+/g, " ")
-        : undefined;
+      setPhoneChecking(true);
+      const phone = normalizeStoredPhone(form.phone, form.country).replace(
+        /\s+/g,
+        " ",
+      );
       void lookupLeadContact(
         {
           phone,
-          email: email || undefined,
           excludeId: leadId || undefined,
         },
         controller.signal,
@@ -399,18 +478,32 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
         .then((result) => {
           if (controller.signal.aborted) return;
           if (result.exists) {
-            setDuplicateTeam(result.teamName?.trim() || "Unassigned");
+            setPhoneExists(true);
+            setPhoneTeam(result.teamName?.trim() || "Unassigned");
+            setExistingPortals(
+              Array.isArray(result.existingPortals)
+                ? result.existingPortals.filter(Boolean)
+                : [],
+            );
+            setExistingSources(
+              Array.isArray(result.existingSources)
+                ? result.existingSources.filter(Boolean)
+                : [],
+            );
           } else {
-            setDuplicateTeam(null);
+            setPhoneExists(false);
+            setPhoneTeam(null);
+            setExistingPortals([]);
+            setExistingSources([]);
           }
         })
         .catch((err: unknown) => {
           if (controller.signal.aborted) return;
           if (err instanceof DOMException && err.name === "AbortError") return;
-          setDuplicateTeam(null);
+          clearPhonePresence();
         })
         .finally(() => {
-          if (!controller.signal.aborted) setDuplicateChecking(false);
+          if (!controller.signal.aborted) setPhoneChecking(false);
         });
     }, 350);
 
@@ -418,14 +511,14 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [open, loading, form.email, form.phone, form.country, leadId]);
+  }, [open, loading, form.phone, form.country, leadId]);
 
   const setPhone = (raw: string, mode: "type" | "legacy" = "type") => {
     setForm((prev) => {
       const phone =
         mode === "legacy"
           ? normalizeStoredPhone(raw, prev.country)
-          : normalizePhoneInput(raw);
+          : normalizePhoneInput(raw, prev.country);
       const matched = matchCountryFromPhone(phone, prev.country);
       if (matched) {
         return { ...prev, phone, country: matched.name };
@@ -470,22 +563,12 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
   const canSubmit = useMemo(() => {
     if (loading) return false;
-    if (duplicateTeam) return false;
-    if (duplicateChecking) return false;
-    if (!form.fullName.trim()) return false;
     if (!form.source) return false;
     if (!form.qualificationStatus) return false;
     if (portalIsOther && !form.portalOther.trim()) return false;
     if (Number.isNaN(firstResponseMinutes)) return false;
     return true;
-  }, [
-    form,
-    portalIsOther,
-    loading,
-    duplicateTeam,
-    duplicateChecking,
-    firstResponseMinutes,
-  ]);
+  }, [form, portalIsOther, loading, firstResponseMinutes]);
 
   if (!mounted || !present) return null;
 
@@ -503,11 +586,11 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
       : form.portalSelect.trim();
 
     const payload: CreateLeadPayload = {
-      fullName: form.fullName.trim(),
       source: form.source,
       qualificationStatus: form.qualificationStatus,
       leadScore: form.leadScore,
     };
+    if (form.fullName.trim()) payload.fullName = form.fullName.trim();
     if (form.email.trim()) payload.email = form.email.trim();
     if (isMeaningfulPhone(form.phone)) {
       payload.phone = normalizeStoredPhone(
@@ -647,9 +730,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
               description="Who the lead is and how to reach them."
             >
               <div className="sm:col-span-2">
-                <FieldLabel htmlFor="lead-fullName" required>
-                  Full name
-                </FieldLabel>
+                <FieldLabel htmlFor="lead-fullName">Full name</FieldLabel>
                 <input
                   id="lead-fullName"
                   className={inputClass}
@@ -657,7 +738,6 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   onChange={(e) => set("fullName")(e.target.value)}
                   placeholder="Client full name"
                   autoFocus={!isEdit}
-                  required
                   disabled={loading}
                 />
               </div>
@@ -682,8 +762,8 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                 <div
                   className={[
                     "group flex h-11 items-stretch overflow-hidden rounded-xl border bg-[#fbfbfc] transition-[border-color,box-shadow,background-color]",
-                    duplicateTeam
-                      ? "border-[rgba(201,42,42,0.45)] focus-within:border-[rgba(201,42,42,0.55)] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(201,42,42,0.1)]"
+                    phoneExists
+                      ? "border-[rgba(232,104,18,0.35)] focus-within:border-[rgba(232,104,18,0.5)] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
                       : [
                           "border-[rgba(33,37,41,0.1)] hover:border-[rgba(33,37,41,0.16)]",
                           "focus-within:border-[rgba(232,104,18,0.5)] focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(232,104,18,0.1)]",
@@ -729,18 +809,26 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   />
                 </div>
                 <p className="mt-1.5 min-h-4 text-[11px] transition-colors duration-200">
-                  {duplicateTeam ? (
-                    <span className="text-[#c92a2a]">
+                  {phoneChecking ? (
+                    <span className="text-[#adb5bd]">Checking number…</span>
+                  ) : phoneExists && phoneTeam ? (
+                    <span className="text-[#9a3f00]">
                       Already in{" "}
-                      <span className="font-medium">{duplicateTeam}</span>
+                      <span className="font-medium">{phoneTeam}</span>
                     </span>
-                  ) : duplicateChecking ? (
-                    <span className="text-[#adb5bd]">Checking contact…</span>
+                  ) : isCompletePhoneNumber(form.phone, form.country) ? (
+                    <span className="text-[#868e96]">
+                      Number not on an existing lead
+                    </span>
                   ) : matchedDial ? (
                     <span className="text-[#868e96]">
                       Matched{" "}
                       <span className="font-medium text-[#495057]">
                         {matchedDial.name}
+                      </span>
+                      <span className="text-[#adb5bd]">
+                        {" "}
+                        · finish the number to check teams
                       </span>
                     </span>
                   ) : form.phone.trim().length > 1 ? (
@@ -832,8 +920,21 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   options={portalOptions}
                   placeholder="Select portal"
                   searchable
+                  markedValues={markedPortalValues}
+                  markedHint="On file"
                   onChange={(value) => set("portalSelect")(value)}
                 />
+                {phoneExists && existingPortals.length > 0 ? (
+                  <p className="mt-1.5 text-[11px] text-[#868e96]">
+                    Already used with this number:{" "}
+                    <span className="font-medium text-[#495057]">
+                      {existingPortals.slice(0, 3).join(", ")}
+                      {existingPortals.length > 3
+                        ? ` +${existingPortals.length - 3}`
+                        : ""}
+                    </span>
+                  </p>
+                ) : null}
               </div>
 
               {portalIsOther ? (
@@ -843,7 +944,16 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   </FieldLabel>
                   <input
                     id="lead-portal-other"
-                    className={inputClass}
+                    className={[
+                      inputClass,
+                      existingPortals.some(
+                        (p) =>
+                          p.trim().toLowerCase() ===
+                          form.portalOther.trim().toLowerCase(),
+                      )
+                        ? "border-[rgba(232,104,18,0.35)] bg-[#fff7ef]"
+                        : "",
+                    ].join(" ")}
                     value={form.portalOther}
                     onChange={(e) => set("portalOther")(e.target.value)}
                     placeholder="Enter portal name"
@@ -863,8 +973,21 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
                   options={sourceOptions}
                   placeholder="Select source"
                   required
+                  markedValues={markedSourceValues}
+                  markedHint="On file"
                   onChange={(value) => set("source")(value)}
                 />
+                {phoneExists && existingSources.length > 0 ? (
+                  <p className="mt-1.5 text-[11px] text-[#868e96]">
+                    Already used with this number:{" "}
+                    <span className="font-medium text-[#495057]">
+                      {existingSources.slice(0, 3).join(", ")}
+                      {existingSources.length > 3
+                        ? ` +${existingSources.length - 3}`
+                        : ""}
+                    </span>
+                  </p>
+                ) : null}
               </div>
 
               <div>

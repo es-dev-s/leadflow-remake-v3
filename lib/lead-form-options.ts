@@ -68,7 +68,8 @@ export function qualificationLabel(status: string | null | undefined) {
 }
 
 export type CreateLeadPayload = {
-  fullName: string;
+  /** Optional — blank names are allowed. */
+  fullName?: string;
   email?: string;
   phone?: string;
   country?: string;

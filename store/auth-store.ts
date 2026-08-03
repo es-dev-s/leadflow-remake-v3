@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import {
   clearAuthToken,
+  COOKIE_SESSION,
   getAuthToken,
   setAuthToken,
 } from "@/lib/auth-token";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/roles";
 
 type AuthState = {
+  /** Opaque session marker — never a JWT. */
   token: string | null;
   user: PublicUser | null;
   bootstrapped: boolean;
@@ -32,12 +34,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   bootstrapped: false,
 
-  setSession: (token, expiresAt, user) => {
+  setSession: (_token, expiresAt, user) => {
     const prevUserId = get().user?.id;
-    setAuthToken(token, expiresAt);
+    // Ignore JWT bodies — cookie is authoritative; store only a marker.
+    setAuthToken(COOKIE_SESSION, expiresAt);
     writeCachedUser(user);
-    set({ token, user, bootstrapped: true });
-    // Switching accounts in the same browser must drop the previous user's data.
+    set({ token: COOKIE_SESSION, user, bootstrapped: true });
     if (prevUserId && prevUserId !== user.id) {
       resetClientState();
     }
@@ -54,6 +56,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     writeCachedUser(null);
     resetClientState();
     set({ token: null, user: null, bootstrapped: true });
+    void import("@/lib/api")
+      .then((m) => m.logoutRequest())
+      .catch(() => {
+        /* ignore */
+      });
     realtime.refreshAuth();
   },
 

@@ -13,14 +13,13 @@ export type RealtimeEvent = {
 type Listener = (event: RealtimeEvent) => void;
 
 /**
- * Single shared SSE connection for the whole app. EventSource reconnects
- * automatically on network blips; we additionally guard against auth changes,
- * hard errors, and back-off so we never hammer the server under load.
+ * Single shared SSE connection for the whole app. Auth is the HttpOnly cookie
+ * (withCredentials) — never put JWTs in the query string.
  */
 class RealtimeClient {
   private source: EventSource | null = null;
   private listeners = new Set<Listener>();
-  private token: string | null = null;
+  private sessionMarker: string | null = null;
   private reconnectTimer: number | null = null;
   private retryDelay = 1000;
   private readonly maxDelay = 20000;
@@ -34,10 +33,10 @@ class RealtimeClient {
     };
   }
 
-  /** Call after login / logout so the stream re-auths with the new token. */
+  /** Call after login / logout so the stream re-auths with the new session. */
   refreshAuth() {
     const next = getAuthToken();
-    if (next === this.token && this.source) return;
+    if (next === this.sessionMarker && this.source) return;
     this.reconnect();
   }
 
@@ -52,7 +51,6 @@ class RealtimeClient {
   }
 
   private onVisibility = () => {
-    // Browsers can silently drop a background SSE socket; re-verify on return.
     if (document.visibilityState === "visible" && !this.source) {
       this.connect();
     }
@@ -66,21 +64,18 @@ class RealtimeClient {
     if (typeof window === "undefined") return;
     if (this.source) return;
 
-    const token = getAuthToken();
-    this.token = token;
-    if (!token) {
-      // Not signed in yet — retry shortly; cheap and bounded.
+    const marker = getAuthToken();
+    this.sessionMarker = marker;
+    if (!marker) {
       this.scheduleReconnect(2000);
       return;
     }
 
-    const url = `${BACKEND_URL}/api/events?access_token=${encodeURIComponent(
-      token,
-    )}`;
+    const url = `${BACKEND_URL}/api/events`;
 
     let es: EventSource;
     try {
-      es = new EventSource(url);
+      es = new EventSource(url, { withCredentials: true });
     } catch {
       this.scheduleReconnect();
       return;
@@ -100,7 +95,6 @@ class RealtimeClient {
         return;
       }
       if (!parsed || !parsed.type) return;
-      // Something changed somewhere — cached aggregates are no longer trusted.
       clearQueryCache();
       for (const listener of this.listeners) {
         try {
@@ -112,9 +106,6 @@ class RealtimeClient {
     };
 
     es.onerror = () => {
-      // EventSource will try to reconnect on its own, but if the token is
-      // stale (401) it loops forever. Close and reconnect with backoff so a
-      // refreshed token is picked up.
       void import("@/lib/telemetry-api")
         .then((m) =>
           m.emitConnectionBreak("realtime EventSource error", "/api/events"),

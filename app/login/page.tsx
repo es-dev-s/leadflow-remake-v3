@@ -1,7 +1,7 @@
 "use client";
 
 import { ApiError, fetchMe, loginRequest } from "@/lib/api";
-import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
+import { COOKIE_SESSION, clearAuthToken, getAuthToken } from "@/lib/auth-token";
 import { isAbortError } from "@/lib/reset-client-state";
 import { useAuthStore } from "@/store/auth-store";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,23 +34,18 @@ function LoginForm() {
   }, [searchParams]);
 
   useEffect(() => {
-    const token = getAuthToken();
-    if (!token) return;
+    // Always probe the HttpOnly cookie — no JWT in JS storage.
     const controller = new AbortController();
     bootstrapAbortRef.current = controller;
     void fetchMe(controller.signal)
       .then((user) => {
         if (controller.signal.aborted) return;
-        // Ignore if a newer login already replaced the token.
-        if (getAuthToken() !== token) return;
-        setSession(token, "", user);
+        setSession(COOKIE_SESSION, "", user);
         router.replace(nextPath);
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || isAbortError(err)) return;
-        // Never wipe a token that was set by a concurrent successful login.
-        if (getAuthToken() !== token) return;
-        clearAuthToken();
+        if (getAuthToken()) clearAuthToken();
       });
     return () => {
       controller.abort();
@@ -70,13 +65,12 @@ function LoginForm() {
     const cleanEmail = email.trim().replace(/^["']+|["']+$/g, "").trim().toLowerCase();
     const cleanPassword = password.replace(/^["']+|["']+$/g, "");
 
-    // Cancel bootstrap /me so a stale failure cannot clear the new session.
     bootstrapAbortRef.current?.abort();
     bootstrapAbortRef.current = null;
 
     try {
       const result = await loginRequest(cleanEmail, cleanPassword);
-      setSession(result.token, result.expiresAt, result.user);
+      setSession(COOKIE_SESSION, result.expiresAt, result.user);
       router.replace(nextPath);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -181,16 +175,6 @@ function LoginForm() {
             {submitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-[#adb5bd]">
-          Demo Superadmin
-          <br />
-          <span className="select-all text-[#868e96]">
-            superadmin@demo.local
-          </span>
-          {" · "}
-          <span className="select-all text-[#868e96]">LeadFlow1!</span>
-        </p>
       </div>
     </div>
   );

@@ -9,7 +9,6 @@ import {
   type ChangeEvent,
   type DragEvent,
 } from "react";
-import { getAuthToken } from "@/lib/auth-token";
 import { BACKEND_URL, uploadFirstResponseProof } from "@/lib/api";
 
 type Props = {
@@ -44,9 +43,8 @@ export function FirstResponseProofDrop({ value, disabled, onChange }: Props) {
 
     let revoked: string | null = null;
     const controller = new AbortController();
-    const token = getAuthToken();
     void fetch(proofSrc(value), {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      credentials: "include",
       signal: controller.signal,
       cache: "no-store",
     })

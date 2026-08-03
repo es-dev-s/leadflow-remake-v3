@@ -1,6 +1,6 @@
 import type { CreateLeadPayload } from "@/lib/lead-form-options";
 import type { LeadRecord } from "@/lib/leads-data";
-import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
+import { clearAuthToken } from "@/lib/auth-token";
 import {
   clearQueryCache,
   readQueryCache,
@@ -40,6 +40,14 @@ function redirectToLogin() {
   if (handlingUnauthorized) return;
   handlingUnauthorized = true;
   clearAuthToken();
+  // Best-effort cookie clear (HttpOnly cookie is cleared by the API).
+  void fetch(`${BACKEND_URL}/api/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+  }).catch(() => {
+    /* ignore */
+  });
   // Drop in-memory session data before hard redirect (avoids flash of prior user).
   void import("@/lib/reset-client-state")
     .then((m) => m.resetClientState())
@@ -59,10 +67,7 @@ export async function apiFetch(
   const { auth = true, skipAuthRedirect = false, headers, signal, ...rest } =
     options;
   const nextHeaders = new Headers(headers);
-  if (auth) {
-    const token = getAuthToken();
-    if (token) nextHeaders.set("Authorization", `Bearer ${token}`);
-  }
+  // Auth is the HttpOnly cookie via credentials: "include" (no Bearer in JS).
   // Let the browser set multipart boundaries for FormData uploads.
   const isFormData =
     typeof FormData !== "undefined" && rest.body instanceof FormData;
@@ -87,6 +92,7 @@ export async function apiFetch(
         ...rest,
         signal: timeoutController.signal,
         headers: nextHeaders,
+        credentials: "include",
         cache: "no-store",
       },
     );
@@ -594,22 +600,25 @@ export async function fetchLead(
 export async function lookupLeadContact(
   params: {
     phone?: string;
-    email?: string;
     excludeId?: string;
   },
   signal?: AbortSignal,
 ): Promise<{
+  /** Phone number already exists on some lead (informational). */
   exists: boolean;
   id?: string;
   leadName?: string;
   teamName?: string;
-  matchedOn?: "phone" | "email" | string;
+  matchedOn?: string;
+  /** Portals already used with this phone on the platform. */
+  existingPortals?: string[];
+  /** Sources already used with this phone on the platform. */
+  existingSources?: string[];
 }> {
   const sp = new URLSearchParams();
   if (params.phone?.trim()) sp.set("phone", params.phone.trim());
-  if (params.email?.trim()) sp.set("email", params.email.trim());
   if (params.excludeId?.trim()) sp.set("excludeId", params.excludeId.trim());
-  if (![...sp.keys()].length) {
+  if (!sp.get("phone")) {
     return { exists: false };
   }
   const res = await apiFetch(`/api/leads/contact-lookup?${sp.toString()}`, {
@@ -623,7 +632,9 @@ export async function lookupLeadContact(
     id?: string;
     leadName?: string;
     teamName?: string;
-    matchedOn?: "phone" | "email" | string;
+    matchedOn?: string;
+    existingPortals?: string[];
+    existingSources?: string[];
   };
 }
 
@@ -991,6 +1002,8 @@ export type PublicUser = {
   managerId: string | null;
   managerName: string | null;
   isOutboundAnalyst: boolean;
+  /** Account enabled — inactive users cannot log in; data is kept. */
+  isActive: boolean;
   isActiveSession: boolean;
   activeSessionSetAt: string | null;
   image: string | null;
@@ -1018,7 +1031,8 @@ export async function fetchUsers(
 }
 
 export type AuthResponse = {
-  token: string;
+  /** Present for API clients; browsers must not persist this. */
+  token?: string;
   expiresAt: string;
   user: PublicUser;
 };
@@ -1044,6 +1058,18 @@ export async function loginRequest(
     throw await readApiError(res, "Login failed");
   }
   return (await res.json()) as AuthResponse;
+}
+
+export async function logoutRequest(): Promise<void> {
+  try {
+    await apiFetch("/api/auth/logout", {
+      method: "POST",
+      auth: false,
+      skipAuthRedirect: true,
+    });
+  } catch {
+    /* cookie clear is best-effort */
+  }
 }
 
 export async function fetchMe(signal?: AbortSignal): Promise<PublicUser> {
@@ -1150,6 +1176,26 @@ export async function updateUserRequest(
         ? data.temporaryPassword
         : undefined,
   };
+}
+
+export async function setUserActiveRequest(
+  id: string,
+  isActive: boolean,
+  signal?: AbortSignal,
+): Promise<PublicUser> {
+  const res = await apiFetch(
+    `/api/users/${encodeURIComponent(id)}/active`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ isActive }),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    throw await readApiError(res, "Failed to update account status");
+  }
+  const data = (await res.json()) as { user: PublicUser };
+  return data.user;
 }
 
 export async function deleteUserRequest(
