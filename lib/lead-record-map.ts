@@ -59,6 +59,8 @@ export function leadDetailToListPatch(
     stageRaw,
     stage: detail.salesStageLabel || seOutcomeLabel(stageRaw) || "—",
     closed: detail.closed || "—",
+    closedAt: detail.closedAt ?? null,
+    timeToCloseMinutes: detail.timeToCloseMinutes ?? null,
     notAppropriate: Boolean(detail.notAppropriate),
     ...(detail.notAppropriate ? { tag: "Not appropriate" as const } : {}),
     ip:

@@ -461,6 +461,22 @@ export async function deleteLeads(
   return (await res.json()) as { deleted: number };
 }
 
+export type QualificationStatusChange = {
+  fromStatus: string | null;
+  toStatus: string;
+  fromLabel: string | null;
+  toLabel: string;
+  changedAt: string;
+  actorName: string | null;
+  reason: string | null;
+  source: string;
+  /** Minutes spent in previous status before this change. */
+  minutesInPrevious: number | null;
+  /** Minutes spent in this status until next change (or now if current). */
+  minutesInStatus: number;
+  isCurrent: boolean;
+};
+
 export type LeadDetail = {
   id: string;
   fullName: string;
@@ -492,9 +508,17 @@ export type LeadDetail = {
   dealCurrency?: string;
   executiveNotes?: string | null;
   closed?: string;
+  /** UTC ISO instant when the lead was closed. */
+  closedAt?: string | null;
+  /** Minutes from lead created date → closedAt. */
+  timeToCloseMinutes?: number | null;
   notAppropriate?: boolean;
   notAppropriateReason?: string | null;
   notAppropriateAt?: string | null;
+  /** When the current qualification status was entered. */
+  qualificationEnteredAt?: string | null;
+  /** Chronological qualification changes with durations. */
+  qualificationHistory?: QualificationStatusChange[];
 };
 
 export type FirstResponseProofUpload = {

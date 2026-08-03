@@ -16,6 +16,12 @@ import {
   markLeadNotAppropriate,
   type LeadDetail,
 } from "@/lib/api";
+import {
+  formatDate,
+  formatDateTime,
+  formatDurationMinutes,
+  formatLeadAddedAt,
+} from "@/lib/datetime";
 import { leadDetailToListPatch } from "@/lib/lead-record-map";
 import {
   canEditLeadProfile,
@@ -37,26 +43,11 @@ type Props = {
 };
 
 function formatFirstResponse(minutes: number) {
-  const whole = Math.max(0, Math.round(minutes));
-  const h = Math.floor(whole / 60);
-  const m = whole % 60;
-  if (h <= 0) return `${m} min`;
-  if (m <= 0) return `${h}h`;
-  return `${h}h ${m}m`;
+  return formatDurationMinutes(minutes);
 }
 
 function formatDateTimeLabel(value: string | null | undefined) {
-  const raw = (value ?? "").trim();
-  if (!raw) return null;
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return raw.replace("T", " ");
-  return parsed.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(value);
 }
 
 function ProofThumb({ path }: { path: string }) {
@@ -339,7 +330,12 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
               </h2>
               <p className="mt-0.5 truncate text-[12px] text-[#868e96]">
                 {detail?.source || listLead?.source || "—"}
-                {listLead?.createdAt ? ` · ${listLead.createdAt}` : ""}
+                {listLead?.createdAt || detail?.createdAt
+                  ? ` · ${formatLeadAddedAt(
+                      listLead?.createdAt || detail?.createdAt,
+                      listLead?.createdAtRaw,
+                    )}`
+                  : ""}
               </p>
             </div>
             <button
@@ -459,7 +455,19 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                     value={detail?.facebookProfile}
                   />
                   <Field label="Language" value={detail?.language} />
-                  <Field label="Date" value={detail?.createdAt} />
+                  <Field
+                    label="Date"
+                    value={
+                      detail?.createdAt
+                        ? formatDate(detail.createdAt)
+                        : listLead
+                          ? formatLeadAddedAt(
+                              listLead.createdAt,
+                              listLead.createdAtRaw,
+                            )
+                          : null
+                    }
+                  />
                   <Field
                     label="Lead score"
                     value={
@@ -503,9 +511,106 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                         : listLead?.dealValue)
                     }
                   />
-                  <Field label="Closed" value={detail?.closed || listLead?.closed} />
+                  {detail?.closedAt || listLead?.closedAt ? (
+                    <>
+                      <Field label="Closed" value="Closed" />
+                      <Field
+                        label="Closed at"
+                        value={formatDateTimeLabel(
+                          detail?.closedAt || listLead?.closedAt,
+                        )}
+                      />
+                      <Field
+                        label="Time to close"
+                        value={formatDurationMinutes(
+                          detail?.timeToCloseMinutes ??
+                            listLead?.timeToCloseMinutes,
+                        )}
+                      />
+                    </>
+                  ) : (
+                    <Field
+                      label="Closed"
+                      value={detail?.closed || listLead?.closed || "Open"}
+                    />
+                  )}
                 </div>
               </section>
+
+              {detail?.qualificationHistory &&
+              detail.qualificationHistory.length > 0 ? (
+                <section className="space-y-2.5 border-t border-[rgba(33,37,41,0.05)] pt-4">
+                  <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">
+                    Status history
+                  </p>
+                  <ol className="m-0 list-none space-y-0 p-0">
+                    {[...detail.qualificationHistory]
+                      .reverse()
+                      .map((step, idx, arr) => {
+                        const when = formatDateTimeLabel(step.changedAt);
+                        const duration = formatDurationMinutes(
+                          step.minutesInStatus,
+                        );
+                        const isLast = idx === arr.length - 1;
+                        return (
+                          <li
+                            key={`${step.changedAt}-${step.toStatus}-${idx}`}
+                            className="relative flex gap-3 pb-3 last:pb-0"
+                          >
+                            <div className="relative flex w-3 shrink-0 flex-col items-center self-stretch">
+                              <span
+                                className={[
+                                  "mt-1.5 h-2 w-2 shrink-0 rounded-full ring-2",
+                                  step.isCurrent
+                                    ? "bg-[#e86812] ring-[rgba(232,104,18,0.22)]"
+                                    : "bg-[#ced4da] ring-transparent",
+                                ].join(" ")}
+                                aria-hidden
+                              />
+                              {!isLast ? (
+                                <span
+                                  className="mt-1 w-px flex-1 bg-[rgba(33,37,41,0.08)]"
+                                  aria-hidden
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-baseline justify-between gap-3">
+                                <p
+                                  className={[
+                                    "min-w-0 truncate text-[13px] leading-snug",
+                                    step.isCurrent
+                                      ? "font-medium text-[#212529]"
+                                      : "text-[#495057]",
+                                  ].join(" ")}
+                                >
+                                  {step.toLabel}
+                                </p>
+                                <p
+                                  className={[
+                                    "shrink-0 tabular-nums text-[12px] leading-snug",
+                                    step.isCurrent
+                                      ? "font-medium text-[#9a3f00]"
+                                      : "text-[#868e96]",
+                                  ].join(" ")}
+                                >
+                                  {duration}
+                                </p>
+                              </div>
+                              {(when || step.actorName) && (
+                                <p className="mt-0.5 truncate text-[11px] text-[#adb5bd]">
+                                  {[when, step.actorName]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </p>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ol>
+                </section>
+              ) : null}
 
               <section className="space-y-3 border-t border-[rgba(33,37,41,0.05)] pt-4">
                 <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">

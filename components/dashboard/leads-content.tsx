@@ -38,6 +38,11 @@ import {
   type LeadColumnId,
 } from "@/lib/leads-columns";
 import type { LeadRecord } from "@/lib/leads-data";
+import {
+  formatDateTimeShort,
+  formatDurationMinutes,
+  formatLeadAddedAt,
+} from "@/lib/datetime";
 import { HighlightPhone, HighlightText } from "@/lib/highlight-match";
 import { deleteLeads, fetchLead } from "@/lib/api";
 import {
@@ -252,14 +257,36 @@ function ColumnCell({
           </p>
         </td>
       );
-    case "closed":
+    case "closed": {
+      const closedWhen = lead.closedAt
+        ? formatDateTimeShort(lead.closedAt)
+        : lead.closed === "Closed"
+          ? "Closed"
+          : "—";
+      const closeAge =
+        lead.timeToCloseMinutes != null
+          ? formatDurationMinutes(lead.timeToCloseMinutes)
+          : "";
+      const closedTitle = closeAge
+        ? `${closedWhen} · ${closeAge} to close`
+        : closedWhen;
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle text-[13px] text-[#495057]">
-          <p className="truncate" title={lead.closed}>
-            <HighlightText text={lead.closed} query={searchQuery} />
+          <p className="truncate" title={closedTitle}>
+            {lead.closedAt ? (
+              <>
+                <HighlightText text={closedWhen} query={searchQuery} />
+                {closeAge ? (
+                  <span className="text-[#adb5bd]"> · {closeAge}</span>
+                ) : null}
+              </>
+            ) : (
+              <HighlightText text={closedWhen} query={searchQuery} />
+            )}
           </p>
         </td>
       );
+    }
     case "ip":
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle text-[13px] tabular-nums text-[#6c757d]">
@@ -276,14 +303,16 @@ function ColumnCell({
           </p>
         </td>
       );
-    case "added":
+    case "added": {
+      const addedLabel = formatLeadAddedAt(lead.createdAt, lead.createdAtRaw);
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle text-[13px] text-[#6c757d]">
-          <p className="truncate" title={lead.createdAt}>
-            <HighlightText text={lead.createdAt} query={searchQuery} />
+          <p className="truncate" title={addedLabel}>
+            <HighlightText text={addedLabel} query={searchQuery} />
           </p>
         </td>
       );
+    }
     case "team": {
       const { route, exec } = routeDisplay(lead.team, lead.salesExecutive);
       return (

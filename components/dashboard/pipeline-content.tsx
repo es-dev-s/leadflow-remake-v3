@@ -18,6 +18,7 @@ import {
   type PipelineSummary,
 } from "@/lib/api";
 import type { LeadRecord } from "@/lib/leads-data";
+import { formatLeadAddedAt } from "@/lib/datetime";
 import { useVirtualWindow } from "@/hooks/use-virtual-window";
 import {
   isLeadAnalyst,
@@ -693,7 +694,7 @@ export function PipelineContent() {
                         </td>
                         <td className="overflow-hidden px-4 py-2 text-[13px] text-[#495057]">
                           <span className="block truncate">
-                            {lead.createdAt || "—"}
+                            {formatLeadAddedAt(lead.createdAt, lead.createdAtRaw)}
                           </span>
                         </td>
                       </tr>

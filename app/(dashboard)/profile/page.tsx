@@ -1,17 +1,7 @@
 "use client";
 
+import { formatDate } from "@/lib/datetime";
 import { useAuthStore } from "@/store/auth-store";
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);

@@ -20,6 +20,7 @@ import {
   isMainTeamLead,
   isSalesExecutive,
 } from "@/lib/roles";
+import { formatDateTimeShort } from "@/lib/datetime";
 import { useAuthStore } from "@/store/auth-store";
 
 type TabId = "leads" | "sales-exec";
@@ -31,15 +32,7 @@ function formatCount(value: number) {
 }
 
 function formatWhen(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDateTimeShort(value);
 }
 
 function actionTone(action: string) {

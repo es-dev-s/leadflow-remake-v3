@@ -32,21 +32,11 @@ import {
 } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { subscribeRealtime } from "@/lib/realtime";
+import { formatDate } from "@/lib/datetime";
 import { canManageUsers, useAuthStore } from "@/store/auth-store";
 
 function formatCount(value: number) {
   return value.toLocaleString("en-US");
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function initials(name: string) {

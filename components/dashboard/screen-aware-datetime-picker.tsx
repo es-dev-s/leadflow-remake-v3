@@ -115,21 +115,23 @@ function sameDay(a: Date, b: Date) {
 function formatDisplay(raw: string, mode: PickerMode) {
   const d = parseValue(raw);
   if (!d) return null;
+  // Values are wall-clock components (not UTC instants). Format from those
+  // components so the label always matches the picker value.
   if (mode === "date") {
-    return d.toLocaleDateString(undefined, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+    const month = d.toLocaleDateString("en-US", { month: "short" });
+    return `${weekday}, ${month} ${d.getDate()}, ${d.getFullYear()}`;
   }
-  return d.toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // Naive YYYY-MM-DDTHH:mm is stored as local components in parseValue —
+  // use those components directly so the label matches the selected wall clock.
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  const day = d.getDate();
+  const hour = d.getHours();
+  const minute = d.getMinutes();
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 || 12;
+  return `${weekday}, ${month} ${day}, ${h12}:${pad2(minute)} ${ampm}`;
 }
 
 function formatDraftParts(date: Date, hour: number, minute: number) {

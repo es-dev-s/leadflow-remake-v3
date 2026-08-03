@@ -36,7 +36,11 @@ function formatRelativeTime(value: string) {
   if (Math.abs(diffHr) < 24) return rtf.format(diffHr, "hour");
   const diffDay = Math.round(diffHr / 24);
   if (Math.abs(diffDay) < 7) return rtf.format(diffDay, "day");
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kathmandu",
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
 
 export function Navbar() {

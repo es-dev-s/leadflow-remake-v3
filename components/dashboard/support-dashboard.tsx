@@ -25,10 +25,12 @@ function formatTime(value: string) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-US", {
+    timeZone: "Asia/Kathmandu",
     month: "short",
     day: "numeric",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -187,7 +189,7 @@ function StatusSeriesChart({ series }: { series: SupportStatusBucket[] }) {
                   fill={colorForStatus(seg.code)}
                   opacity={0.9}
                 >
-                  <title>{`${new Date(h.hour).toLocaleString()} · ${seg.code}: ${seg.count}`}</title>
+                  <title>{`${new Date(h.hour).toLocaleString("en-US", { timeZone: "Asia/Kathmandu" })} · ${seg.code}: ${seg.count}`}</title>
                 </rect>
               );
             })}
@@ -200,6 +202,7 @@ function StatusSeriesChart({ series }: { series: SupportStatusBucket[] }) {
                 style={{ fontSize: 10 }}
               >
                 {new Date(h.hour).toLocaleTimeString("en-US", {
+                  timeZone: "Asia/Kathmandu",
                   hour: "numeric",
                 })}
               </text>
@@ -264,7 +267,7 @@ function ConnectionChart({
       <path d={d} fill="none" stroke="#e86812" strokeWidth={2} />
       {points.map((p) => (
         <circle key={p.hour} cx={p.x} cy={p.y} r={3} fill="#e86812">
-          <title>{`${new Date(p.hour).toLocaleString()} · ${p.count}`}</title>
+          <title>{`${new Date(p.hour).toLocaleString("en-US", { timeZone: "Asia/Kathmandu" })} · ${p.count}`}</title>
         </circle>
       ))}
     </svg>
