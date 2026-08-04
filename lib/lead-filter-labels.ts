@@ -166,6 +166,18 @@ export function formatFacetChips(input: {
   }
   if (f.status) chips.push(`Status: ${statusLabel(f.status)}`);
   if (f.stage) chips.push(`Stage: ${stageLabel(f.stage)}`);
+  if ("serviceLine" in f && f.serviceLine) {
+    const line = f.serviceLine.toUpperCase();
+    const label =
+      line === "CCL"
+        ? "NAATI CCL"
+        : line === "ACS"
+          ? "ACS RPL"
+          : line === "PTE"
+            ? "PTE Hub"
+            : line;
+    chips.push(`Service: ${label}`);
+  }
   if ("reason" in f && f.reason) {
     chips.push(
       f.reason === "No reason recorded" || f.reason === "none"

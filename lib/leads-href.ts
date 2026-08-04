@@ -12,6 +12,8 @@ export type LeadsDeepLink = {
   metaProfile?: string;
   status?: string;
   stage?: string;
+  /** Report brand scope: CDR | CCL | PTE | ACS (portal ILIKE grouping). */
+  serviceLine?: string;
   /** Exact extracted qualification reason (matches dashboard reasons buckets). */
   reason?: string;
   /** Inclusive YYYY-MM-DD range for createdAt. */
@@ -35,6 +37,7 @@ const PARAM_KEYS = [
   "metaProfile",
   "status",
   "stage",
+  "serviceLine",
   "reason",
   "addedFrom",
   "addedTo",
@@ -70,6 +73,7 @@ export function parseLeadsDeepLink(
     metaProfile: get("metaProfile"),
     status: get("status"),
     stage: get("stage"),
+    serviceLine: get("serviceLine"),
     reason: get("reason"),
     addedFrom: get("addedFrom"),
     addedTo: get("addedTo"),
@@ -94,6 +98,7 @@ export function hasLeadFacets(link: LeadsDeepLink): boolean {
       link.metaProfile ||
       link.status ||
       link.stage ||
+      link.serviceLine ||
       link.reason ||
       link.addedFrom ||
       link.addedTo ||

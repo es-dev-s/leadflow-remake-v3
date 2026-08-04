@@ -29,6 +29,8 @@ export type LeadFacets = {
   metaProfile: string;
   status: string;
   stage: string;
+  /** Report brand scope: CDR | CCL | PTE | ACS. */
+  serviceLine: string;
   /** Exact extracted qualification reason. */
   reason: string;
   addedFrom: string;
@@ -46,6 +48,7 @@ const EMPTY_FACETS: LeadFacets = {
   metaProfile: "",
   status: "",
   stage: "",
+  serviceLine: "",
   reason: "",
   addedFrom: "",
   addedTo: "",
@@ -209,6 +212,7 @@ function facetParams(facets: LeadFacets) {
     metaProfile: facets.metaProfile || undefined,
     status: facets.status || undefined,
     stage: facets.stage || undefined,
+    serviceLine: facets.serviceLine || undefined,
     reason: facets.reason || undefined,
     addedFrom: facets.addedFrom || undefined,
     addedTo: facets.addedTo || undefined,
@@ -447,6 +451,7 @@ export const useLeadsStore = create<LeadsState>()(
           metaProfile: facets.metaProfile?.trim() ?? "",
           status,
           stage: facets.stage?.trim() ?? "",
+          serviceLine: facets.serviceLine?.trim() ?? "",
           reason: facets.reason?.trim() ?? "",
           addedFrom: range.addedFrom,
           addedTo: range.addedTo,
@@ -494,6 +499,7 @@ export const useLeadsStore = create<LeadsState>()(
           metaProfile: link.metaProfile?.trim() ?? "",
           status,
           stage: link.stage?.trim() ?? "",
+          serviceLine: link.serviceLine?.trim() ?? "",
           reason: link.reason?.trim() ?? "",
           addedFrom: range.addedFrom,
           addedTo: range.addedTo,

@@ -45,6 +45,7 @@ const EMPTY_DRAFT_FACETS: LeadFacets = {
   metaProfile: "",
   status: "",
   stage: "",
+  serviceLine: "",
   reason: "",
   addedFrom: "",
   addedTo: "",

@@ -63,11 +63,11 @@ export const mainNavItems: NavItem[] = [
     description: "Lead handoff and reassignment history",
   },
   {
-    id: "report",
-    label: "Report",
-    href: "/report",
+    id: "reports",
+    label: "Reports",
+    href: "/reports",
     icon: FileBarChart2,
-    description: "Performance summaries and exports",
+    description: "Lead quality and marketing insights",
   },
 ];
 

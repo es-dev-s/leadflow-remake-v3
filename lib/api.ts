@@ -253,6 +253,110 @@ export type AttributionStats = {
   conversion: number;
 };
 
+export type ReportBucketRow = {
+  name: string;
+  total: number;
+  qualified: number;
+  notQualified: number;
+  irrelevant: number;
+  closedWon: number;
+  closedLost: number;
+  revenue?: number;
+};
+
+export type ReportTrendRow = {
+  key: string;
+  label: string;
+  total: number;
+  qualified: number;
+  closedWon: number;
+};
+
+export type ReportReasonRow = {
+  reason: string;
+  count: number;
+};
+
+export type ReportServiceDemand = {
+  name: string;
+  enquiries: number;
+  qualified: number;
+  closedWon: number;
+  revenue?: number;
+  captured: boolean;
+};
+
+export type ReportLanguageTrend = {
+  name: string;
+  recent: number;
+  prior: number;
+  total18m: number;
+  growthPct?: number;
+};
+
+export type ReportTotals = {
+  leads: number;
+  qualified: number;
+  notQualified: number;
+  irrelevant: number;
+  closedWon: number;
+  closedLost: number;
+  revenue: number;
+  avgTimeToCloseMinutes?: number;
+  avgFirstResponseMinutes?: number;
+};
+
+export type ReportResponse = {
+  totals: ReportTotals;
+  serviceLines: ReportBucketRow[];
+  qualifiedCountries: ReportBucketRow[];
+  qualifiedCities: ReportBucketRow[];
+  irrelevantCountries: ReportBucketRow[];
+  irrelevantCities: ReportBucketRow[];
+  exclusionCandidates: ReportBucketRow[];
+  exclusionCities: ReportBucketRow[];
+  sources: ReportBucketRow[];
+  portals: ReportBucketRow[];
+  monthlyTrend: ReportTrendRow[];
+  irrelevantReasons: ReportReasonRow[];
+  irrelevantPatterns: ReportReasonRow[];
+  lostReasons: ReportReasonRow[];
+  lostOpportunityFactors: ReportReasonRow[];
+  serviceDemand: ReportServiceDemand[];
+  languageDemand: ReportServiceDemand[];
+  languageTrend: ReportLanguageTrend[];
+  promoDemand: ReportServiceDemand[];
+};
+
+export async function fetchReport(
+  params: {
+    country?: string;
+    city?: string;
+    source?: string;
+    portal?: string;
+    serviceLine?: string;
+    addedFrom?: string;
+    addedTo?: string;
+    signal?: AbortSignal;
+  } = {},
+): Promise<ReportResponse> {
+  const sp = new URLSearchParams();
+  if (params.country) sp.set("country", params.country);
+  if (params.city) sp.set("city", params.city);
+  if (params.source) sp.set("source", params.source);
+  if (params.portal) sp.set("portal", params.portal);
+  if (params.serviceLine) sp.set("serviceLine", params.serviceLine);
+  if (params.addedFrom) sp.set("addedFrom", params.addedFrom);
+  if (params.addedTo) sp.set("addedTo", params.addedTo);
+  const qs = sp.toString();
+  return getJSONCached<ReportResponse>(
+    `/api/report${qs ? `?${qs}` : ""}`,
+    30_000,
+    params.signal,
+    "Failed to load report",
+  );
+}
+
 export type LeadSummary = {
   activeUsers: number;
   leadsTotal: number;
@@ -313,6 +417,8 @@ export type FetchLeadsParams = {
   metaProfile?: string;
   status?: string;
   stage?: string;
+  /** Report brand portal group: CDR | CCL | PTE | ACS */
+  serviceLine?: string;
   reason?: string;
   addedFrom?: string;
   addedTo?: string;
@@ -352,6 +458,7 @@ export async function fetchLeads(
   if (params.metaProfile) sp.set("metaProfile", params.metaProfile);
   if (params.status) sp.set("status", params.status);
   if (params.stage) sp.set("stage", params.stage);
+  if (params.serviceLine) sp.set("serviceLine", params.serviceLine);
   if (params.reason) sp.set("reason", params.reason);
   if (params.addedFrom) sp.set("addedFrom", params.addedFrom);
   if (params.addedTo) sp.set("addedTo", params.addedTo);
