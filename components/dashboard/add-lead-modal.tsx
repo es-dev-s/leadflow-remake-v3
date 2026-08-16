@@ -32,7 +32,7 @@ import {
   normalizeStoredPhone,
   phoneDigits,
 } from "@/lib/country-dial-codes";
-import { canChangeQualification } from "@/lib/roles";
+import { canChangeQualification, canEditLeadProfile } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { LoaderCircle, X } from "lucide-react";
@@ -253,6 +253,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   const isEdit = Boolean(leadId);
   const role = useAuthStore((s) => s.user?.role);
   const allowQualify = canChangeQualification(role);
+  const allowProfileEdit = canEditLeadProfile(role);
   const [mounted, setMounted] = useState(false);
   const [present, setPresent] = useState(false);
   const [entered, setEntered] = useState(false);
@@ -571,12 +572,13 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
   const canSubmit = useMemo(() => {
     if (loading) return false;
+    if (isEdit && !allowProfileEdit) return false;
     if (!form.source) return false;
     if (!form.qualificationStatus) return false;
     if (portalIsOther && !form.portalOther.trim()) return false;
     if (Number.isNaN(firstResponseMinutes)) return false;
     return true;
-  }, [form, portalIsOther, loading, firstResponseMinutes]);
+  }, [form, portalIsOther, loading, firstResponseMinutes, isEdit, allowProfileEdit]);
 
   if (!mounted || !present) return null;
 

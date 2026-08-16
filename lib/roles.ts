@@ -165,9 +165,11 @@ export function canMutateLeads(role: string | null | undefined) {
   );
 }
 
-/** Who may create new leads (SEs work assigned inventory only). */
+/** Superadmin, ATL, and Lead Analyst may add leads. */
 export function canCreateLeads(role: string | null | undefined) {
-  return canMutateLeads(role) && !isSalesExecutive(role);
+  return (
+    isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
+  );
 }
 
 /** Who may reassign leads to teams / members. */
@@ -194,14 +196,11 @@ export function canChangeQualification(role: string | null | undefined) {
 }
 
 /**
- * Full lead create/edit (contact, source, analyst notes, etc.).
- * Main Team Leads assign within the team; they do not edit lead profile data.
- * Sales Executives update sales outcome only.
+ * Full lead profile edit (contact, source, notes, etc.).
+ * Superadmin and ATL only. Lead Analysts may create, not edit.
  */
 export function canEditLeadProfile(role: string | null | undefined) {
-  return (
-    isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
-  );
+  return isSuperadmin(role) || isAnalystTeamLead(role);
 }
 
 /** Bulk/single lead deletion — Superadmin and ATL only. */
