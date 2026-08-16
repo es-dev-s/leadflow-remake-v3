@@ -237,7 +237,7 @@ export function OverviewContent() {
     <div
       ref={scrollRef}
       {...{ [OVERVIEW_SCROLL_ATTR]: "" }}
-      className="lf-scroll h-full min-h-0 w-full overflow-y-auto overscroll-contain"
+      className="lf-scroll h-full min-h-0 overflow-y-auto overscroll-contain -mx-3 -my-3 px-3 py-3 sm:-mx-4 sm:-my-3.5 sm:px-4 sm:py-3.5 lg:-mx-6 lg:-my-4 lg:px-6 lg:py-4 2xl:-mx-8 2xl:px-8"
     >
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 pb-8 2xl:gap-5">
         {activeChips.length > 0 ? (
@@ -316,7 +316,7 @@ export function OverviewContent() {
         </div>
 
         {hideCrossTeam ? null : (
-          <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
+          <div className="grid w-full grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
             <div className="h-[560px] min-h-0">
               <TeamMixChart
                 mix={Array.isArray(summary?.teamMix) ? summary.teamMix : []}
@@ -336,22 +336,22 @@ export function OverviewContent() {
 
         {analyticsScoped ? null : (
           <div
-            className={`grid w-full grid-cols-1 gap-4 xl:items-stretch ${
+            className={`grid w-full grid-cols-1 items-stretch gap-4 ${
               teamScoped ? "" : "xl:grid-cols-2"
             }`}
           >
             {teamScoped ? null : (
-              <div className="h-[400px] min-h-0">
+              <div className="h-[520px] min-h-0">
                 <AnalystQualificationTable />
               </div>
             )}
-            <div className="h-[400px] min-h-0">
+            <div className="h-[520px] min-h-0">
               <SalesExecOutcomesTable />
             </div>
           </div>
         )}
 
-        <div className="h-[480px] min-h-0 w-full">
+        <div className="h-[520px] min-h-0 w-full">
           <QualificationReasonsSection
             irrelevantTotal={summary?.irrelevantLeads}
             notQualifiedTotal={summary?.notQualifiedLeads}
@@ -360,16 +360,15 @@ export function OverviewContent() {
 
         {analyticsScoped ? null : (
           <>
-            <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-2 xl:items-stretch">
-              <div className="h-[440px] min-h-0">
+            <div className="grid w-full grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+              <div className="h-[520px] min-h-0">
                 <AttributionPerformanceSection
                   title="Website / Brand"
                   nameHeader="Website"
                   facet="portal"
                 />
               </div>
-
-              <div className="h-[440px] min-h-0">
+              <div className="h-[520px] min-h-0">
                 <AttributionPerformanceSection
                   title="Meta profiles"
                   nameHeader="Meta profile"
@@ -378,7 +377,7 @@ export function OverviewContent() {
               </div>
             </div>
 
-            <div className="h-[440px] min-h-0 w-full">
+            <div className="h-[520px] min-h-0 w-full">
               <AttributionPerformanceSection
                 title="By source"
                 nameHeader="Source"

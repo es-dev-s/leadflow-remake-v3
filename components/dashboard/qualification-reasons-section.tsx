@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useDashboardBucketScroll } from "@/hooks/use-dashboard-bucket-scroll";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { StatusReasonCount } from "@/lib/api";
@@ -56,13 +60,13 @@ export function QualificationReasonsSection({
 
   const rows = useMemo(() => {
     const denom = page.leadTotal > 0 ? page.leadTotal : 1;
-    return (page.items ?? [])
+    return (page.previewItems ?? [])
       .filter((item) => item.count > 0)
       .map((item) => ({
         ...item,
         pct: (item.count / denom) * 100,
       }));
-  }, [page.items, page.leadTotal]);
+  }, [page.previewItems, page.leadTotal]);
 
   const open = (link: LeadsDeepLink) => {
     const base = toDashboardDeepLink(filters);
@@ -112,16 +116,13 @@ export function QualificationReasonsSection({
         ) : null}
       </div>
 
-      <div
-        ref={page.scrollRootRef}
-        className="lf-scroll min-h-0 flex-1 overflow-auto"
-      >
+      <div className={dashboardCardListClass(page.expanded)}>
         {page.loading && rows.length === 0 ? (
-          <div className="flex h-40 items-center justify-center">
+          <div className="flex h-full min-h-0 items-center justify-center">
             <p className="text-[13px] text-[#868e96]">Loading reasons…</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex h-40 items-center justify-center">
+          <div className="flex h-full min-h-0 items-center justify-center">
             <p className="text-[13px] text-[#868e96]">No reasons recorded.</p>
           </div>
         ) : (
@@ -200,17 +201,17 @@ export function QualificationReasonsSection({
           </table>
         )}
 
-        {page.hasMore ? (
-          <div
-            ref={page.sentinelRef}
-            className="flex items-center justify-center px-3 py-3"
-          >
-            <p className="text-[11px] text-[#adb5bd]">
-              {page.loadingMore ? "Loading more…" : "Scroll for more"}
-            </p>
-          </div>
-        ) : null}
       </div>
+      <ViewMoreFooter
+        total={page.bucketCount || page.items.length}
+        expanded={page.expanded}
+        onExpand={() => {
+          void page.revealAll();
+        }}
+        onCollapse={page.collapse}
+        loading={page.loadingMore}
+        noun="reasons"
+      />
     </section>
   );
 }

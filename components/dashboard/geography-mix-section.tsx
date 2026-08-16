@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { feature } from "topojson-client";
 import type { Topology } from "topojson-specification";
 import { GeoFilterSelect } from "@/components/dashboard/geo-filter-select";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
+import { useViewMore } from "@/hooks/use-view-more";
 import {
   buildLeadCountryLookup,
   normalizeCountryKey,
@@ -166,6 +171,7 @@ export function GeographyMixSection({
     () => (Array.isArray(mix) ? mix.filter((item) => item.count > 0) : []),
     [mix],
   );
+  const more = useViewMore(rows);
   const lookup = useMemo(() => buildLeadCountryLookup(rows), [rows]);
   const total = useMemo(
     () => rows.reduce((acc, row) => acc + row.count, 0),
@@ -296,17 +302,17 @@ export function GeographyMixSection({
       </div>
 
       <div
-        className={`grid min-h-0 flex-1 grid-cols-1 transition-opacity duration-200 @[64rem]:grid-cols-[minmax(0,1.6fr)_minmax(240px,0.9fr)] ${
+        className={`grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1.15fr)_minmax(0,0.85fr)] transition-opacity duration-200 @[64rem]:grid-cols-[minmax(0,1.6fr)_minmax(240px,0.9fr)] @[64rem]:grid-rows-1 ${
           busy && rows.length > 0 ? "opacity-70" : "opacity-100"
         }`}
       >
         <div className="relative min-h-0 overflow-hidden bg-white p-2 @[40rem]:p-3">
           {mapError ? (
-            <div className="flex h-full min-h-[240px] items-center justify-center px-4 text-center">
+            <div className="flex h-full items-center justify-center px-4 text-center">
               <p className="text-[13px] text-[#868e96]">{mapError}</p>
             </div>
           ) : geographies.length === 0 ? (
-            <div className="flex h-full min-h-[240px] items-center justify-center px-4 text-center">
+            <div className="flex h-full items-center justify-center px-4 text-center">
               <p className="text-[13px] text-[#868e96]">Loading world map…</p>
             </div>
           ) : (
@@ -374,7 +380,7 @@ export function GeographyMixSection({
               </span>
             ) : null}
           </div>
-          <div className="lf-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className={dashboardCardListClass(more.expanded)}>
             {rows.length === 0 ? (
               <p className="px-4 py-8 text-center text-[13px] text-[#6c757d]">
                 {busy
@@ -385,7 +391,7 @@ export function GeographyMixSection({
               </p>
             ) : (
               <ul className="divide-y divide-[rgba(33,37,41,0.04)]" role="list">
-                {rows.map((row, index) => {
+                {more.visible.map((row, index) => {
                   const pct = (row.count / Math.max(total, 1)) * 100;
                   const isUnknown =
                     normalizeCountryKey(row.name) === "unknown";
@@ -441,6 +447,13 @@ export function GeographyMixSection({
               </ul>
             )}
           </div>
+          <ViewMoreFooter
+            total={more.total}
+            expanded={more.expanded}
+            onExpand={more.expand}
+            onCollapse={more.collapse}
+            noun="countries"
+          />
         </div>
       </div>
     </section>

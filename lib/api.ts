@@ -30,6 +30,8 @@ export class ApiError extends Error {
 type ApiFetchOptions = RequestInit & {
   auth?: boolean;
   skipAuthRedirect?: boolean;
+  /** Override the default 20s hang-guard (exports need longer). */
+  timeoutMs?: number;
 };
 
 let handlingUnauthorized = false;
@@ -64,8 +66,14 @@ export async function apiFetch(
   path: string,
   options: ApiFetchOptions = {},
 ): Promise<Response> {
-  const { auth = true, skipAuthRedirect = false, headers, signal, ...rest } =
-    options;
+  const {
+    auth = true,
+    skipAuthRedirect = false,
+    headers,
+    signal,
+    timeoutMs: timeoutOverride,
+    ...rest
+  } = options;
   const nextHeaders = new Headers(headers);
   // Auth is the HttpOnly cookie via credentials: "include" (no Bearer in JS).
   // Let the browser set multipart boundaries for FormData uploads.
@@ -76,7 +84,7 @@ export async function apiFetch(
   }
 
   // Bound hung requests so UI state machines never wait forever under load.
-  const timeoutMs = 20_000;
+  const timeoutMs = timeoutOverride ?? 20_000;
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
   const onOuterAbort = () => timeoutController.abort();
@@ -438,9 +446,7 @@ export async function fetchBackendHealth(
   return (await res.json()) as BackendHealth;
 }
 
-export async function fetchLeads(
-  params: FetchLeadsParams = {},
-): Promise<LeadListResponse> {
+function buildLeadsSearchParams(params: FetchLeadsParams): URLSearchParams {
   const sp = new URLSearchParams();
   if (params.filter) sp.set("filter", params.filter);
   if (params.sort) sp.set("sort", params.sort);
@@ -462,8 +468,13 @@ export async function fetchLeads(
   if (params.reason) sp.set("reason", params.reason);
   if (params.addedFrom) sp.set("addedFrom", params.addedFrom);
   if (params.addedTo) sp.set("addedTo", params.addedTo);
+  return sp;
+}
 
-  const qs = sp.toString();
+export async function fetchLeads(
+  params: FetchLeadsParams = {},
+): Promise<LeadListResponse> {
+  const qs = buildLeadsSearchParams(params).toString();
   const res = await apiFetch(`/api/leads${qs ? `?${qs}` : ""}`, {
     signal: params.signal,
   });
@@ -471,6 +482,99 @@ export async function fetchLeads(
     throw new Error(`Failed to load leads (${res.status})`);
   }
   return (await res.json()) as LeadListResponse;
+}
+
+export type LeadsExportResult = {
+  filename: string;
+  count: number;
+  total: number;
+  truncated: boolean;
+};
+
+function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null;
+  const utf = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1]);
+    } catch {
+      return utf[1];
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain?.[1]?.trim() || null;
+}
+
+function triggerBlobDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2_000);
+}
+
+async function exportLeadsPdfOnce(
+  params: FetchLeadsParams,
+  signal?: AbortSignal,
+): Promise<LeadsExportResult> {
+  const qs = buildLeadsSearchParams(params).toString();
+  const res = await apiFetch(`/api/leads/export${qs ? `?${qs}` : ""}`, {
+    signal,
+    timeoutMs: 180_000,
+  });
+  if (!res.ok) {
+    throw await readApiError(res, `Failed to export leads (${res.status})`);
+  }
+  const blob = await res.blob();
+  if (blob.size < 8) {
+    throw new ApiError("Export file was empty — try again", res.status);
+  }
+  const filename =
+    filenameFromDisposition(res.headers.get("content-disposition")) ||
+    "leadflow-leads.pdf";
+  triggerBlobDownload(blob, filename);
+  const count = Number(res.headers.get("x-leadflow-export-count") || "0");
+  const total = Number(res.headers.get("x-leadflow-export-total") || count);
+  return {
+    filename,
+    count: Number.isFinite(count) ? count : 0,
+    total: Number.isFinite(total) ? total : 0,
+    truncated: res.headers.get("x-leadflow-export-truncated") === "true",
+  };
+}
+
+/** Downloads a structured PDF of every lead in the current (role-scoped) filter. */
+export async function exportLeadsPdf(
+  params: FetchLeadsParams = {},
+): Promise<LeadsExportResult> {
+  try {
+    return await exportLeadsPdfOnce(params, params.signal);
+  } catch (err) {
+    if (params.signal?.aborted || isLikelyAbort(err)) throw err;
+    if (
+      err instanceof ApiError &&
+      (err.status < 500 || err.status === 504 || err.status === 408)
+    ) {
+      throw err;
+    }
+    // One retry for dropped connections / transient 5xx.
+    await new Promise((resolve) => window.setTimeout(resolve, 700));
+    if (params.signal?.aborted) throw err;
+    return exportLeadsPdfOnce(params, params.signal);
+  }
+}
+
+function isLikelyAbort(err: unknown) {
+  return (
+    (typeof DOMException !== "undefined" &&
+      err instanceof DOMException &&
+      err.name === "AbortError") ||
+    (err instanceof Error && err.name === "AbortError")
+  );
 }
 
 export type AssignableUser = {

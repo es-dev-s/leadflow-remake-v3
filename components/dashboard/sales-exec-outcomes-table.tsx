@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useDashboardBucketScroll } from "@/hooks/use-dashboard-bucket-scroll";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { SalesExecOutcome } from "@/lib/api";
@@ -28,7 +32,7 @@ export function SalesExecOutcomesTable() {
     country,
     city,
   });
-  const list = page.items;
+  const list = page.previewItems;
 
   const openExec = (
     row: SalesExecOutcome,
@@ -79,12 +83,6 @@ export function SalesExecOutcomesTable() {
             <h2 className="text-[16px] font-medium tracking-[-0.03em] text-[#212529] @[28rem]:text-[17px]">
               Leads by Sales Executive
             </h2>
-            {page.bucketCount > list.length ? (
-              <p className="mt-0.5 text-[12px] text-[#868e96]">
-                Showing {formatCount(list.length)} of{" "}
-                {formatCount(page.bucketCount)} · scroll for more
-              </p>
-            ) : null}
           </div>
 
           {!page.loading ? (
@@ -113,7 +111,7 @@ export function SalesExecOutcomesTable() {
 
         {!page.loading ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-[#868e96] @[28rem]:text-[12px]">
-            <span>{totals.executives} executives loaded</span>
+            <span>{formatCount(page.bucketCount)} executives</span>
             <span>{formatCount(totals.withRep)} with rep</span>
             <span className="text-[#2f9e44]">{formatCount(totals.won)} won</span>
             <span>{formatCount(totals.lost)} lost</span>
@@ -122,7 +120,7 @@ export function SalesExecOutcomesTable() {
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
           <p className="text-[13px] text-[#6c757d]">
             {page.loading
               ? "Loading sales executive coverage…"
@@ -130,24 +128,21 @@ export function SalesExecOutcomesTable() {
           </p>
         </div>
       ) : (
-        <div
-          ref={page.scrollRootRef}
-          className="lf-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain"
-        >
+        <div className={dashboardCardListClass(page.expanded)}>
           <table className="w-full min-w-[640px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
               <tr className="border-b border-[rgba(33,37,41,0.05)] text-[10px] font-medium tracking-[0.06em] text-[#adb5bd] uppercase">
-                <th className="w-10 px-3.5 py-2.5 font-medium @[28rem]:px-5">
+                <th className="w-10 px-3.5 py-2 font-medium @[28rem]:px-5">
                   #
                 </th>
-                <th className="px-2 py-2.5 font-medium">Sales executive</th>
-                <th className="hidden min-w-[140px] px-2 py-2.5 font-medium @[48rem]:table-cell">
+                <th className="px-2 py-2 font-medium">Sales executive</th>
+                <th className="hidden min-w-[140px] px-2 py-2 font-medium @[48rem]:table-cell">
                   Share
                 </th>
-                <th className="px-2 py-2.5 text-right font-medium">Leads</th>
-                <th className="px-2 py-2.5 text-right font-medium">With rep</th>
-                <th className="px-2 py-2.5 text-right font-medium">Won</th>
-                <th className="px-3.5 py-2.5 text-right font-medium @[28rem]:px-5">
+                <th className="px-2 py-2 text-right font-medium">Leads</th>
+                <th className="px-2 py-2 text-right font-medium">With rep</th>
+                <th className="px-2 py-2 text-right font-medium">Won</th>
+                <th className="px-3.5 py-2 text-right font-medium @[28rem]:px-5">
                   Lost
                 </th>
               </tr>
@@ -165,10 +160,10 @@ export function SalesExecOutcomesTable() {
                         : "bg-white hover:bg-[#fafbfc]"
                     }`}
                   >
-                    <td className="px-3.5 py-2.5 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
                       {String(index + 1).padStart(2, "0")}
                     </td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-2 py-2">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
@@ -189,7 +184,7 @@ export function SalesExecOutcomesTable() {
                         ) : null}
                       </button>
                     </td>
-                    <td className="hidden px-2 py-2.5 @[48rem]:table-cell">
+                    <td className="hidden px-2 py-2 @[48rem]:table-cell">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
@@ -206,7 +201,7 @@ export function SalesExecOutcomesTable() {
                         </span>
                       </button>
                     </td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="px-2 py-2 text-right">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
@@ -217,7 +212,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(row.assigned)}
                       </button>
                     </td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="px-2 py-2 text-right">
                       <button
                         type="button"
                         onClick={() =>
@@ -228,7 +223,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(row.withRep)}
                       </button>
                     </td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="px-2 py-2 text-right">
                       <button
                         type="button"
                         onClick={() => openExec(row, { filter: "converted" })}
@@ -237,7 +232,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(row.won)}
                       </button>
                     </td>
-                    <td className="px-3.5 py-2.5 text-right @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-right @[28rem]:px-5">
                       <button
                         type="button"
                         onClick={() => openExec(row, { filter: "lost" })}
@@ -251,18 +246,18 @@ export function SalesExecOutcomesTable() {
               })}
             </tbody>
           </table>
-          {page.hasMore ? (
-            <div
-              ref={page.sentinelRef}
-              className="flex items-center justify-center px-3 py-3"
-            >
-              <p className="text-[11px] text-[#adb5bd]">
-                {page.loadingMore ? "Loading more…" : "Scroll for more"}
-              </p>
-            </div>
-          ) : null}
         </div>
       )}
+      <ViewMoreFooter
+        total={page.bucketCount || page.items.length}
+        expanded={page.expanded}
+        onExpand={() => {
+          void page.revealAll();
+        }}
+        onCollapse={page.collapse}
+        loading={page.loadingMore}
+        noun="executives"
+      />
     </section>
   );
 }

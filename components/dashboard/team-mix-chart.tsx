@@ -2,7 +2,12 @@
 
 import { LayoutGrid, List } from "lucide-react";
 import { useMemo, useState } from "react";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useCountTween } from "@/hooks/use-count-tween";
+import { useViewMore } from "@/hooks/use-view-more";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { TeamLeadCount } from "@/lib/api";
 
@@ -113,7 +118,7 @@ function TeamCard({
       onBlur={onClear}
       onClick={onOpen}
       title={`Open leads for ${slice.label}`}
-      className={`flex h-full min-h-[140px] w-full flex-col justify-between rounded-2xl border bg-white p-4 text-left transition-[border-color] duration-150 ${
+      className={`flex h-full min-h-0 w-full flex-col justify-between rounded-2xl border bg-white p-3 text-left transition-[border-color] duration-150 ${
         active
           ? "border-[rgba(255,122,26,0.4)]"
           : "border-[rgba(33,37,41,0.08)] hover:border-[rgba(33,37,41,0.14)]"
@@ -130,7 +135,7 @@ function TeamCard({
               {slice.label}
             </p>
           </div>
-          <p className="mt-2.5 text-[26px] leading-none font-medium tracking-[-0.05em] tabular-nums text-[#212529]">
+          <p className="mt-2 text-[22px] leading-none font-medium tracking-[-0.05em] tabular-nums text-[#212529]">
             {formatCount(slice.count)}
           </p>
         </div>
@@ -139,7 +144,7 @@ function TeamCard({
         </span>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-1.5">
         <GradientBar pct={slice.pct} tone={slice.tone} />
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-[#868e96]">Team share</span>
@@ -176,7 +181,7 @@ function TeamListRow({
       onBlur={onClear}
       onClick={onOpen}
       title={`Open leads for ${slice.label}`}
-      className={`flex w-full flex-col gap-2.5 border-b border-[rgba(33,37,41,0.06)] px-4 py-3.5 text-left transition-colors duration-150 last:border-b-0 sm:grid sm:grid-cols-[44px_minmax(140px,1.1fr)_minmax(160px,1.6fr)_100px_72px] sm:items-center sm:gap-4 ${
+      className={`flex w-full flex-col gap-2 border-b border-[rgba(33,37,41,0.06)] px-4 py-2 text-left transition-colors duration-150 last:border-b-0 sm:grid sm:grid-cols-[44px_minmax(140px,1.1fr)_minmax(160px,1.6fr)_100px_72px] sm:items-center sm:gap-4 ${
         active ? "bg-[#fff7f0]" : "bg-white hover:bg-[#f8f9fa]"
       }`}
     >
@@ -246,6 +251,8 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
   const slices = useMemo(() => buildSlices(mix, total), [mix, total]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("grid");
+  const previewLimit = view === "grid" ? 4 : 10;
+  const more = useViewMore(slices, previewLimit);
 
   const openTeam = (slice: Slice) => {
     navigateToLeads({ teamId: slice.id || "none" });
@@ -276,7 +283,7 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
         className="pointer-events-none absolute -top-20 right-0 h-48 w-48 rounded-full bg-[rgba(255,122,26,0.08)] blur-3xl"
       />
 
-      <div className="relative flex min-h-0 flex-1 flex-col gap-4 p-4 sm:gap-5 sm:p-5">
+      <div className="relative flex h-full min-h-0 flex-col gap-3 p-4 sm:p-5">
         <div className="flex w-full shrink-0 flex-col gap-3 @[36rem]:flex-row @[36rem]:items-end @[36rem]:justify-between">
           <div className="min-w-0 flex-1">
             <h2 className="text-[18px] leading-tight font-medium tracking-[-0.035em] text-[#212529] sm:text-[20px]">
@@ -367,9 +374,13 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
             </div>
           </div>
         ) : view === "grid" ? (
-          <div className="lf-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
-            <div className="grid w-full grid-cols-1 gap-3 @[28rem]:grid-cols-2">
-              {slices.map((slice) => (
+          <div className={dashboardCardListClass(more.expanded)}>
+            <div
+              className={`grid w-full grid-cols-1 gap-3 @[28rem]:grid-cols-2 ${
+                more.expanded ? "" : "h-full min-h-0 @[28rem]:auto-rows-fr"
+              }`}
+            >
+              {more.visible.map((slice) => (
                 <TeamCard
                   key={slice.key}
                   slice={slice}
@@ -400,8 +411,8 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
                 %
               </span>
             </div>
-            <div className="lf-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              {slices.map((slice, index) => (
+            <div className={dashboardCardListClass(more.expanded)}>
+              {more.visible.map((slice, index) => (
                 <TeamListRow
                   key={slice.key}
                   slice={slice}
@@ -415,6 +426,14 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
             </div>
           </div>
         )}
+        <ViewMoreFooter
+          total={more.total}
+          preview={previewLimit}
+          expanded={more.expanded}
+          onExpand={more.expand}
+          onCollapse={more.collapse}
+          noun="teams"
+        />
       </div>
     </section>
   );

@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
+import { useViewMore } from "@/hooks/use-view-more";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { TeamLeadCount } from "@/lib/api";
 
@@ -75,6 +80,7 @@ export function ThinLeadMixSection({
     [mix, total, keyPrefix],
   );
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const more = useViewMore(slices);
 
   const sum = useMemo(
     () => slices.reduce((acc, slice) => acc + slice.count, 0) || total,
@@ -99,13 +105,13 @@ export function ThinLeadMixSection({
       </div>
 
       {slices.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
           <p className="text-[13px] text-[#6c757d]">
             {loading ? `Loading ${emptyLabel}…` : `No ${emptyLabel} yet.`}
           </p>
         </div>
       ) : (
-        <div className="lf-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className={dashboardCardListClass(more.expanded)}>
           <div
             className="sticky top-0 z-10 hidden grid-cols-[36px_minmax(100px,1.2fr)_minmax(80px,1.4fr)_72px_48px] gap-2 border-b border-[rgba(33,37,41,0.05)] bg-[#f8f9fa] px-3.5 py-2 text-[10px] font-medium tracking-[0.06em] text-[#adb5bd] uppercase @[30rem]:grid @[30rem]:px-5 @[36rem]:grid-cols-[40px_minmax(120px,1.2fr)_minmax(100px,1.6fr)_80px_52px] @[36rem]:gap-3"
             aria-hidden
@@ -118,7 +124,7 @@ export function ThinLeadMixSection({
           </div>
 
           <ul className="divide-y divide-[rgba(33,37,41,0.04)]" role="list">
-            {slices.map((slice, index) => {
+            {more.visible.map((slice, index) => {
               const active = activeKey === slice.key;
               return (
                 <li key={slice.key}>
@@ -170,6 +176,13 @@ export function ThinLeadMixSection({
           </ul>
         </div>
       )}
+      <ViewMoreFooter
+        total={more.total}
+        expanded={more.expanded}
+        onExpand={more.expand}
+        onCollapse={more.collapse}
+        noun="teams"
+      />
     </section>
   );
 }

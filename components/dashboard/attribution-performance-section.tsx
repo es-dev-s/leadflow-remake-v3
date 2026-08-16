@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useDashboardBucketScroll } from "@/hooks/use-dashboard-bucket-scroll";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { AttributionStats, SummaryBucketDimension } from "@/lib/api";
@@ -63,7 +67,7 @@ export function AttributionPerformanceSection({
     city,
   });
 
-  const list = page.items;
+  const list = page.previewItems;
 
   const openRow = (name: string) => {
     const value = name.trim();
@@ -99,12 +103,6 @@ export function AttributionPerformanceSection({
             <h2 className="text-[16px] font-medium tracking-[-0.03em] text-[#212529] @[28rem]:text-[17px]">
               {title}
             </h2>
-            {page.bucketCount > page.items.length ? (
-              <p className="mt-0.5 text-[12px] text-[#868e96]">
-                Showing {formatCount(page.items.length)} of{" "}
-                {formatCount(page.bucketCount)} · scroll for more
-              </p>
-            ) : null}
           </div>
 
           {!page.loading ? (
@@ -136,33 +134,30 @@ export function AttributionPerformanceSection({
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
           <p className="text-[13px] text-[#6c757d]">
             {page.loading ? "Loading…" : "No data yet."}
           </p>
         </div>
       ) : (
-        <div
-          ref={page.scrollRootRef}
-          className="lf-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain"
-        >
+        <div className={dashboardCardListClass(page.expanded)}>
           <table className="w-full min-w-[720px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
               <tr className="border-b border-[rgba(33,37,41,0.05)] text-[10px] font-medium tracking-[0.06em] text-[#adb5bd] uppercase">
-                <th className="w-10 px-3.5 py-2.5 font-medium @[28rem]:px-5">
+                <th className="w-10 px-3.5 py-2 font-medium @[28rem]:px-5">
                   #
                 </th>
-                <th className="px-2 py-2.5 font-medium">{nameHeader}</th>
-                <th className="hidden min-w-[140px] px-2 py-2.5 font-medium @[48rem]:table-cell">
+                <th className="px-2 py-2 font-medium">{nameHeader}</th>
+                <th className="hidden min-w-[140px] px-2 py-2 font-medium @[48rem]:table-cell">
                   Volume
                 </th>
-                <th className="px-2 py-2.5 text-right font-medium">
+                <th className="px-2 py-2 text-right font-medium">
                   Total leads
                 </th>
-                <th className="px-2 py-2.5 text-right font-medium">
+                <th className="px-2 py-2 text-right font-medium">
                   Total won
                 </th>
-                <th className="px-3.5 py-2.5 text-right font-medium @[28rem]:px-5">
+                <th className="px-3.5 py-2 text-right font-medium @[28rem]:px-5">
                   Total Conv.
                 </th>
               </tr>
@@ -181,10 +176,10 @@ export function AttributionPerformanceSection({
                         : "bg-white hover:bg-[#fafbfc]"
                     }`}
                   >
-                    <td className="px-3.5 py-2.5 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
                       {String(index + 1).padStart(2, "0")}
                     </td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-2 py-2">
                       <button
                         type="button"
                         onClick={() => openRow(row.name)}
@@ -205,7 +200,7 @@ export function AttributionPerformanceSection({
                         ) : null}
                       </button>
                     </td>
-                    <td className="hidden px-2 py-2.5 @[48rem]:table-cell">
+                    <td className="hidden px-2 py-2 @[48rem]:table-cell">
                       <span className="block h-1 w-full overflow-hidden rounded-full bg-[rgba(33,37,41,0.06)]">
                         <span
                           className="block h-full rounded-full"
@@ -216,7 +211,7 @@ export function AttributionPerformanceSection({
                         />
                       </span>
                     </td>
-                    <td className="px-2 py-2.5 text-right">
+                    <td className="px-2 py-2 text-right">
                       <button
                         type="button"
                         onClick={() => openRow(row.name)}
@@ -227,10 +222,10 @@ export function AttributionPerformanceSection({
                         {formatCount(row.total)}
                       </button>
                     </td>
-                    <td className="px-2 py-2.5 text-right text-[13px] font-medium tabular-nums text-[#2f9e44]">
+                    <td className="px-2 py-2 text-right text-[13px] font-medium tabular-nums text-[#2f9e44]">
                       {formatCount(row.won)}
                     </td>
-                    <td className="px-3.5 py-2.5 text-right @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-right @[28rem]:px-5">
                       <span
                         className="inline-flex min-w-[3.25rem] justify-end rounded-md px-1.5 py-0.5 text-[12px] font-medium tabular-nums"
                         style={{
@@ -249,18 +244,18 @@ export function AttributionPerformanceSection({
               })}
             </tbody>
           </table>
-          {page.hasMore ? (
-            <div
-              ref={page.sentinelRef}
-              className="flex items-center justify-center px-3 py-3"
-            >
-              <p className="text-[11px] text-[#adb5bd]">
-                {page.loadingMore ? "Loading more…" : "Scroll for more"}
-              </p>
-            </div>
-          ) : null}
         </div>
       )}
+      <ViewMoreFooter
+        total={page.bucketCount || page.items.length}
+        expanded={page.expanded}
+        onExpand={() => {
+          void page.revealAll();
+        }}
+        onCollapse={page.collapse}
+        loading={page.loadingMore}
+        noun="rows"
+      />
     </section>
   );
 }

@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  dashboardCardListClass,
+  ViewMoreFooter,
+} from "@/components/dashboard/view-more-footer";
 import { useDashboardBucketScroll } from "@/hooks/use-dashboard-bucket-scroll";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import type { AnalystLeadStats } from "@/lib/api";
@@ -19,7 +23,7 @@ export function AnalystQualificationTable() {
     country,
     city,
   });
-  const list = page.items;
+  const list = page.previewItems;
 
   const openAnalyst = (row: AnalystLeadStats, filter?: string) => {
     const analystId = row.id?.trim() || "none";
@@ -36,12 +40,6 @@ export function AnalystQualificationTable() {
           <h2 className="text-[15px] font-medium tracking-[-0.03em] text-[#212529] @[28rem]:text-[17px]">
             Analyst qualification
           </h2>
-          {page.bucketCount > list.length ? (
-            <p className="mt-0.5 text-[11px] text-[#868e96]">
-              Showing {formatCount(list.length)} of{" "}
-              {formatCount(page.bucketCount)} · scroll for more
-            </p>
-          ) : null}
         </div>
         <p className="shrink-0 text-[11px] tabular-nums text-[#868e96] @[28rem]:text-[12px]">
           {page.loading ? "" : `${formatCount(page.bucketCount)} analysts`}
@@ -49,7 +47,7 @@ export function AnalystQualificationTable() {
       </div>
 
       {list.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-8 text-center">
           <p className="text-[13px] text-[#6c757d]">
             {page.loading
               ? "Loading analyst qualifications…"
@@ -57,22 +55,19 @@ export function AnalystQualificationTable() {
           </p>
         </div>
       ) : (
-        <div
-          ref={page.scrollRootRef}
-          className="lf-scroll min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain"
-        >
+        <div className={dashboardCardListClass(page.expanded)}>
           <table className="w-full min-w-[520px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
               <tr className="border-b border-[rgba(33,37,41,0.05)] text-[10px] font-medium tracking-[0.06em] text-[#adb5bd] uppercase">
-                <th className="px-3.5 py-2.5 font-medium @[28rem]:px-5">
+                <th className="px-3.5 py-2 font-medium @[28rem]:px-5">
                   Lead analyst
                 </th>
-                <th className="px-2 py-2.5 text-right font-medium">Total</th>
-                <th className="px-2 py-2.5 text-right font-medium">Qualified</th>
-                <th className="px-2 py-2.5 text-right font-medium">
+                <th className="px-2 py-2 text-right font-medium">Total</th>
+                <th className="px-2 py-2 text-right font-medium">Qualified</th>
+                <th className="px-2 py-2 text-right font-medium">
                   Not qual.
                 </th>
-                <th className="px-3.5 py-2.5 text-right font-medium @[28rem]:px-5">
+                <th className="px-3.5 py-2 text-right font-medium @[28rem]:px-5">
                   Irrelevant
                 </th>
               </tr>
@@ -83,7 +78,7 @@ export function AnalystQualificationTable() {
                   key={row.id || `${row.name}:${row.email}`}
                   className="border-b border-[rgba(33,37,41,0.04)] last:border-b-0 hover:bg-[#fafbfc]"
                 >
-                  <td className="px-3.5 py-2.5 @[28rem]:px-5">
+                  <td className="px-3.5 py-2 @[28rem]:px-5">
                     <button
                       type="button"
                       onClick={() => openAnalyst(row)}
@@ -98,7 +93,7 @@ export function AnalystQualificationTable() {
                       </p>
                     </button>
                   </td>
-                  <td className="px-2 py-2.5 text-right">
+                  <td className="px-2 py-2 text-right">
                     <button
                       type="button"
                       onClick={() => openAnalyst(row)}
@@ -107,7 +102,7 @@ export function AnalystQualificationTable() {
                       {formatCount(row.total)}
                     </button>
                   </td>
-                  <td className="px-2 py-2.5 text-right">
+                  <td className="px-2 py-2 text-right">
                     <button
                       type="button"
                       onClick={() => openAnalyst(row, "qualified")}
@@ -116,7 +111,7 @@ export function AnalystQualificationTable() {
                       {formatCount(row.qualified)}
                     </button>
                   </td>
-                  <td className="px-2 py-2.5 text-right">
+                  <td className="px-2 py-2 text-right">
                     <button
                       type="button"
                       onClick={() => openAnalyst(row, "new")}
@@ -125,7 +120,7 @@ export function AnalystQualificationTable() {
                       {formatCount(row.notQualified)}
                     </button>
                   </td>
-                  <td className="px-3.5 py-2.5 text-right @[28rem]:px-5">
+                  <td className="px-3.5 py-2 text-right @[28rem]:px-5">
                     <button
                       type="button"
                       onClick={() => openAnalyst(row, "irrelevant")}
@@ -138,18 +133,18 @@ export function AnalystQualificationTable() {
               ))}
             </tbody>
           </table>
-          {page.hasMore ? (
-            <div
-              ref={page.sentinelRef}
-              className="flex items-center justify-center px-3 py-3"
-            >
-              <p className="text-[11px] text-[#adb5bd]">
-                {page.loadingMore ? "Loading more…" : "Scroll for more"}
-              </p>
-            </div>
-          ) : null}
         </div>
       )}
+      <ViewMoreFooter
+        total={page.bucketCount || page.items.length}
+        expanded={page.expanded}
+        onExpand={() => {
+          void page.revealAll();
+        }}
+        onCollapse={page.collapse}
+        loading={page.loadingMore}
+        noun="analysts"
+      />
     </section>
   );
 }

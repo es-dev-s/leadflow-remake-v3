@@ -12,7 +12,7 @@ import {
   type SummaryBucketDimension,
 } from "@/lib/api";
 
-export const DASHBOARD_BUCKET_PAGE_SIZE = 50;
+export const DASHBOARD_BUCKET_PAGE_SIZE = 10;
 
 type Options = {
   dimension: SummaryBucketDimension;
@@ -21,11 +21,15 @@ type Options = {
   city?: string;
   pageSize?: number;
   enabled?: boolean;
+  /** When false (default), the page scroll stays primary — load the rest via revealAll. */
+  autoLoad?: boolean;
+  previewLimit?: number;
 };
 
 /**
  * Offset pagination for high-cardinality dashboard mixes.
- * First page loads immediately; further pages load via IntersectionObserver.
+ * First page loads immediately. Extra rows load on demand (View more),
+ * not by trapping the wheel inside the card.
  */
 export function useDashboardBucketScroll<T>({
   dimension,
@@ -34,6 +38,8 @@ export function useDashboardBucketScroll<T>({
   city = "",
   pageSize = DASHBOARD_BUCKET_PAGE_SIZE,
   enabled = true,
+  autoLoad = false,
+  previewLimit = DASHBOARD_BUCKET_PAGE_SIZE,
 }: Options) {
   const [items, setItems] = useState<T[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -43,6 +49,7 @@ export function useDashboardBucketScroll<T>({
   const [loading, setLoading] = useState(enabled);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -60,6 +67,7 @@ export function useDashboardBucketScroll<T>({
       setLeadTotal(0);
       setWonTotal(0);
       setLoading(false);
+      setExpanded(false);
       setError(null);
       return;
     }
@@ -70,6 +78,7 @@ export function useDashboardBucketScroll<T>({
     loadingMoreRef.current = false;
     setLoading(true);
     setLoadingMore(false);
+    setExpanded(false);
     setError(null);
 
     void fetchSummaryBuckets<T>({
@@ -141,11 +150,62 @@ export function useDashboardBucketScroll<T>({
     }
   }, [enabled, hasMore, dimension, status, country, city, pageSize]);
 
+  const revealAll = useCallback(async () => {
+    if (!enabled) {
+      setExpanded(true);
+      return;
+    }
+    if (hasMore && !loadingMoreRef.current) {
+      const epoch = epochRef.current;
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+      try {
+        const remaining = Math.max(bucketCount - offsetRef.current, pageSize);
+        const page = await fetchSummaryBuckets<T>({
+          dimension,
+          status,
+          country: country || undefined,
+          city: city || undefined,
+          offset: offsetRef.current,
+          limit: Math.max(remaining, 1_000),
+        });
+        if (epoch !== epochRef.current) return;
+        setItems((prev) => [...prev, ...page.items]);
+        setHasMore(page.hasMore);
+        setBucketCount(page.bucketCount);
+        setLeadTotal(page.leadTotal);
+        setWonTotal(page.wonTotal ?? 0);
+        offsetRef.current += page.items.length;
+      } catch (err: unknown) {
+        if (epoch !== epochRef.current) return;
+        setError(err instanceof Error ? err.message : "Failed to load more");
+      } finally {
+        if (epoch === epochRef.current) {
+          loadingMoreRef.current = false;
+          setLoadingMore(false);
+        }
+      }
+    }
+    setExpanded(true);
+  }, [
+    enabled,
+    hasMore,
+    bucketCount,
+    dimension,
+    status,
+    country,
+    city,
+    pageSize,
+  ]);
+
+  const collapse = useCallback(() => setExpanded(false), []);
+
   const onIntersect = useEffectEvent(() => {
     void loadMore();
   });
 
   useEffect(() => {
+    if (!autoLoad) return;
     const sentinel = sentinelRef.current;
     const root = scrollRootRef.current;
     if (!enabled || !hasMore || !sentinel) return;
@@ -169,10 +229,14 @@ export function useDashboardBucketScroll<T>({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [enabled, hasMore, items.length, geoKey]);
+  }, [autoLoad, enabled, hasMore, items.length, geoKey]);
+
+  const previewItems = expanded ? items : items.slice(0, previewLimit);
+  const hiddenCount = Math.max(bucketCount, items.length) - previewLimit;
 
   return {
     items,
+    previewItems,
     hasMore,
     bucketCount,
     leadTotal,
@@ -180,6 +244,11 @@ export function useDashboardBucketScroll<T>({
     loading,
     loadingMore,
     error,
+    expanded,
+    canExpand: hiddenCount > 0 || hasMore,
+    hiddenCount: Math.max(hiddenCount, 0),
+    revealAll,
+    collapse,
     scrollRootRef,
     sentinelRef,
   };

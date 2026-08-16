@@ -44,7 +44,7 @@ import {
   formatLeadAddedAt,
 } from "@/lib/datetime";
 import { HighlightPhone, HighlightText } from "@/lib/highlight-match";
-import { deleteLeads, fetchLead } from "@/lib/api";
+import { ApiError, deleteLeads, exportLeadsPdf, fetchLead } from "@/lib/api";
 import {
   canAssignLeads,
   canAssignToTeamLeads,
@@ -1038,6 +1038,110 @@ function SelectionBar({
   );
 }
 
+function LeadsExportButton() {
+  const filterValue = useLeadsStore((s) => s.filterValue);
+  const sortValue = useLeadsStore((s) => s.sortValue);
+  const searchQuery = useLeadsStore((s) => s.searchQuery);
+  const searchField = useLeadsStore((s) => s.searchField);
+  const facets = useLeadsStore((s) => s.facets);
+  const totalAvailable = useLeadsStore((s) => s.totalAvailable);
+  const { start, succeed, fail, isPending } = useActionPhase(1400);
+  const [error, setError] = useState<string | null>(null);
+
+  const committedSearch =
+    searchQuery.trim().length >= 2 ? searchQuery.trim() : "";
+  const filtered = Boolean(
+    (filterValue && filterValue !== "all") ||
+      committedSearch ||
+      hasLeadFacets(facets),
+  );
+
+  async function onExport() {
+    if (isPending) return;
+    setError(null);
+    start();
+    try {
+      const result = await exportLeadsPdf({
+        filter: filterValue,
+        sort: sortValue,
+        q: committedSearch || undefined,
+        field: searchField || undefined,
+        country: facets.country || undefined,
+        city: facets.city || undefined,
+        teamId: facets.teamId || undefined,
+        analystId: facets.analystId || undefined,
+        salesExecId: facets.salesExecId || undefined,
+        source: facets.source || undefined,
+        portal: facets.portal || undefined,
+        metaProfile: facets.metaProfile || undefined,
+        status: facets.status || undefined,
+        stage: facets.stage || undefined,
+        serviceLine: facets.serviceLine || undefined,
+        reason: facets.reason || undefined,
+        addedFrom: facets.addedFrom || undefined,
+        addedTo: facets.addedTo || undefined,
+      });
+      if (result.count === 0) {
+        await succeed("No leads to export");
+        return;
+      }
+      await succeed(
+        `Exported ${result.count.toLocaleString("en-US")} lead${result.count === 1 ? "" : "s"}`,
+      );
+    } catch (err) {
+      fail();
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : "Export failed");
+      }
+    }
+  }
+
+  const label = filtered ? "Export filtered" : "Export";
+  const title = filtered
+    ? "Download a PDF of every lead matching the current filters"
+    : totalAvailable > 0
+      ? `Download a PDF of all ${totalAvailable.toLocaleString("en-US")} leads in your scope`
+      : "Download a PDF of all leads in your scope";
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          void onExport();
+        }}
+        disabled={isPending}
+        title={title}
+        className="lf-pressable inline-flex h-9 items-center gap-1.5 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white px-2.5 text-[13px] font-medium text-[#212529] hover:bg-[#f8f9fa] disabled:cursor-wait disabled:opacity-70 sm:px-3"
+      >
+        {isPending ? (
+          <LoaderCircle
+            size={14}
+            strokeWidth={1.75}
+            className="animate-spin text-[#6c757d]"
+          />
+        ) : (
+          <Download
+            size={14}
+            strokeWidth={1.5}
+            className="text-[#6c757d]"
+          />
+        )}
+        <span className="hidden sm:inline">
+          {isPending ? "Exporting…" : label}
+        </span>
+      </button>
+      {error ? (
+        <p className="absolute top-[calc(100%+6px)] right-0 z-20 max-w-[16rem] rounded-md border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-2 py-1 text-[11px] text-[#c92a2a] shadow-sm">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function LeadsContent() {
   const searchParams = useSearchParams();
   const {
@@ -1283,17 +1387,7 @@ export function LeadsContent() {
 
         <div className="flex flex-wrap items-center gap-2">
           <CustomizePanel />
-          <button
-            type="button"
-            className="lf-pressable inline-flex h-9 items-center gap-1.5 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white px-2.5 text-[13px] font-medium text-[#212529] hover:bg-[#f8f9fa] sm:px-3"
-          >
-            <Download
-              size={14}
-              strokeWidth={1.5}
-              className="text-[#6c757d]"
-            />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          <LeadsExportButton />
           {allowCreate ? (
             <button
               type="button"
