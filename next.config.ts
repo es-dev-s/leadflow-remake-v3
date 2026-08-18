@@ -6,6 +6,12 @@ const telemetry =
   process.env.TELEMETRY_URL?.replace(/\/$/, "") || "http://127.0.0.1:9081";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Avoid Next.js focusing the page container after client navigations (e.g. login
+    // → dashboard), which draws a thin focus outline around the main content.
+    appNewScrollHandler: true,
+  },
+
   // Allow opening the dev app via LAN IP (phone / other devices).
   allowedDevOrigins: [
     "192.168.0.129",

@@ -247,7 +247,7 @@ export function OverviewContent() {
     <div
       ref={scrollRef}
       {...{ [OVERVIEW_SCROLL_ATTR]: "" }}
-      className="lf-scroll h-full min-h-0 overflow-y-auto overscroll-contain -mx-3 -my-3 px-3 py-3 sm:-mx-4 sm:-my-3.5 sm:px-4 sm:py-3.5 lg:-mx-6 lg:-my-4 lg:px-6 lg:py-4 2xl:-mx-8 2xl:px-8"
+      className="lf-scroll h-full min-h-0 overflow-y-auto overscroll-contain outline-none focus:outline-none -mx-3 -my-3 px-3 py-3 sm:-mx-4 sm:-my-3.5 sm:px-4 sm:py-3.5 lg:-mx-6 lg:-my-4 lg:px-6 lg:py-4 2xl:-mx-8 2xl:px-8"
     >
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 pb-8 2xl:gap-5">
         {activeChips.length > 0 ? (

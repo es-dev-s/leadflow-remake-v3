@@ -41,6 +41,7 @@ function LoginForm() {
       .then((user) => {
         if (controller.signal.aborted) return;
         setSession(COOKIE_SESSION, "", user);
+        (document.activeElement as HTMLElement | null)?.blur?.();
         router.replace(nextPath);
       })
       .catch((err: unknown) => {
@@ -71,6 +72,7 @@ function LoginForm() {
     try {
       const result = await loginRequest(cleanEmail, cleanPassword);
       setSession(COOKIE_SESSION, result.expiresAt, result.user);
+      (document.activeElement as HTMLElement | null)?.blur?.();
       router.replace(nextPath);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -170,7 +172,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-5 flex h-11 w-full items-center justify-center rounded-xl bg-[#212529] text-[13px] font-medium text-white transition-opacity disabled:opacity-70"
+            className="mt-5 flex h-11 w-full items-center justify-center rounded-xl bg-[#212529] text-[13px] font-medium text-white outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-[#e86812]/35 focus-visible:ring-offset-2 disabled:opacity-70"
           >
             {submitting ? "Signing in…" : "Sign in"}
           </button>

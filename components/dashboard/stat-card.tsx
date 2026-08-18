@@ -23,7 +23,7 @@ export function StatCard({
     "transition-[border-color,transform] duration-150",
     compact ? "px-3 py-3" : "p-4",
     interactive
-      ? "lf-pressable cursor-pointer hover:border-[rgba(33,37,41,0.12)] active:scale-[0.99]"
+      ? "lf-pressable cursor-pointer outline-none hover:border-[rgba(33,37,41,0.12)] focus-visible:ring-2 focus-visible:ring-[#e86812]/35 focus-visible:ring-offset-2 active:scale-[0.99]"
       : "",
   ]
     .filter(Boolean)
