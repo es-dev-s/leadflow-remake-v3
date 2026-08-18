@@ -17,9 +17,17 @@ export function StatCard({
   onClick,
 }: StatCardProps) {
   const interactive = Boolean(onClick);
-  const className = `rounded-xl border border-[rgba(33,37,41,0.06)] bg-white text-left transition-[border-color,transform] duration-150 hover:border-[rgba(33,37,41,0.12)] ${
-    compact ? "px-3 py-3" : "p-4"
-  } ${interactive ? "lf-pressable cursor-pointer active:scale-[0.99]" : ""}`;
+  const className = [
+    "h-full w-full rounded-xl border border-[rgba(33,37,41,0.06)] bg-white",
+    "flex flex-col items-center justify-center text-center",
+    "transition-[border-color,transform] duration-150",
+    compact ? "px-3 py-3" : "p-4",
+    interactive
+      ? "lf-pressable cursor-pointer hover:border-[rgba(33,37,41,0.12)] active:scale-[0.99]"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const body = (
     <>
@@ -31,7 +39,7 @@ export function StatCard({
         {label}
       </p>
       <div
-        className={`flex items-end justify-between gap-2 ${
+        className={`flex items-end justify-center gap-2 ${
           compact ? "mt-2" : "mt-3 gap-3"
         }`}
       >
@@ -48,13 +56,14 @@ export function StatCard({
           </span>
         ) : null}
       </div>
-      {detail ? (
+      {detail || compact ? (
         <p
-          className={`text-[10px] tabular-nums tracking-[-0.01em] text-[#868e96] ${
-            compact ? "mt-1.5" : "mt-2"
-          }`}
+          className={`text-[10px] tabular-nums tracking-[-0.01em] ${
+            compact ? "mt-1.5 min-h-[14px]" : "mt-2 min-h-[16px]"
+          } ${detail ? "text-[#868e96]" : "text-transparent select-none"}`}
+          aria-hidden={detail ? undefined : true}
         >
-          {detail}
+          {detail ?? "\u00a0"}
         </p>
       ) : null}
     </>
