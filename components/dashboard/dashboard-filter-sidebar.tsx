@@ -547,8 +547,8 @@ export function DashboardFilterSidebar() {
               </div>
 
               <p className="rounded-xl border border-[rgba(33,37,41,0.06)] bg-[#f8f9fa] px-3 py-2.5 text-[11px] leading-relaxed text-[#868e96]">
-                Country and city refresh dashboard KPIs. Other fields apply when
-                you open matching leads.
+                Applied filters update dashboard KPIs, tables, and charts.
+                Open matching leads to see the same slice in the list.
               </p>
             </div>
           )}

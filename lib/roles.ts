@@ -176,11 +176,8 @@ export function canMutateLeads(role: string | null | undefined) {
   );
 }
 
-/** Superadmin and ATL may require a password reset on next login. */
-export function canSetPasswordResetRequirement(
-  role: string | null | undefined,
-) {
-  return isSuperadmin(role) || isAnalystTeamLead(role);
+export function roleNeedsNamedTeam(role: string | null | undefined) {
+  return isMainTeamLead(role) || isAnalystTeamLead(role);
 }
 
 /** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
@@ -218,10 +215,13 @@ export function canChangeQualification(role: string | null | undefined) {
 
 /**
  * Full lead profile edit (contact, source, notes, etc.).
- * Superadmin and ATL only. Lead Analysts may create, not edit.
+ * Superadmin and ATL may edit any accessible lead. Lead Analysts may edit
+ * leads they created (list/API are already creator-scoped).
  */
 export function canEditLeadProfile(role: string | null | undefined) {
-  return isSuperadmin(role) || isAnalystTeamLead(role);
+  return (
+    isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
+  );
 }
 
 /** Bulk/single lead deletion — Superadmin and ATL only. */

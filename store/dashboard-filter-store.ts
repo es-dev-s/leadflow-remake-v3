@@ -49,8 +49,40 @@ type DashboardFilterState = {
   clearFilters: () => void;
 };
 
+export function dashboardFiltersToScope(filters: DashboardFilters) {
+  return {
+    country: filters.country || undefined,
+    city: filters.city || undefined,
+    filter: filters.filterValue !== "all" ? filters.filterValue : undefined,
+    teamId: filters.teamId || undefined,
+    analystId: filters.analystId || undefined,
+    salesExecId: filters.salesExecId || undefined,
+    source: filters.source || undefined,
+    portal: filters.portal || undefined,
+    status: filters.status || undefined,
+    stage: filters.stage || undefined,
+    addedFrom: filters.addedFrom || undefined,
+    addedTo: filters.addedTo || undefined,
+  };
+}
+
 export function hasDashboardKpiFilters(filters: DashboardFilters) {
-  return Boolean(filters.country || filters.city);
+  return (
+    filters.filterValue !== "all" ||
+    Boolean(
+      filters.country ||
+        filters.city ||
+        filters.source ||
+        filters.portal ||
+        filters.teamId ||
+        filters.analystId ||
+        filters.salesExecId ||
+        filters.status ||
+        filters.stage ||
+        filters.addedFrom ||
+        filters.addedTo,
+    )
+  );
 }
 
 export function hasDashboardLeadLinkFilters(filters: DashboardFilters) {

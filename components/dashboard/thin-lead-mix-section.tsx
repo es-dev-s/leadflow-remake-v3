@@ -22,15 +22,15 @@ function buildSlices(
   total: number,
   keyPrefix: string,
 ): Slice[] {
-  const rows = Array.isArray(mix) ? mix.filter((item) => item && item.count > 0) : [];
+  const rows = Array.isArray(mix)
+    ? mix.filter((item) => item && item.count > 0 && (item.id ?? "").trim())
+    : [];
   const sum = rows.reduce((acc, item) => acc + item.count, 0) || Math.max(total, 1);
 
-  return rows.map((item, index) => {
-    const label = (item.name ?? "").trim() || "Unassigned";
-    const id = (item.id ?? "").trim() || "none";
-    const key = item.id
-      ? `${keyPrefix}:${item.id}`
-      : `${keyPrefix}:unassigned:${label}:${index}`;
+  return rows.map((item) => {
+    const label = (item.name ?? "").trim() || "Unnamed";
+    const id = (item.id ?? "").trim();
+    const key = `${keyPrefix}:${id}`;
     return {
       key,
       id,
@@ -88,7 +88,9 @@ export function ThinLeadMixSection({
   );
 
   const openSlice = (slice: Slice) => {
-    navigateToLeads({ teamId: slice.id || "none" });
+    const teamId = slice.id?.trim();
+    if (!teamId) return;
+    navigateToLeads({ teamId });
   };
 
   return (

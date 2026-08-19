@@ -14,7 +14,7 @@ export function RoutedTeamsMixChart({ mix, total, loading = false }: Props) {
     <ThinLeadMixSection
       title="Leads routed to teams"
       entityLabel="Team"
-      emptyLabel="team routing data"
+      emptyLabel="routed team data"
       keyPrefix="route"
       barTone="#ff7a1a"
       mix={mix}

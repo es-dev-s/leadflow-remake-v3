@@ -9,7 +9,7 @@ import {
   type RoleOption,
 } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
-import { creatableRoleOptions, canSetPasswordResetRequirement, roleDisplayLabel } from "@/lib/roles";
+import { creatableRoleOptions, isLeadAnalyst, roleDisplayLabel, Role } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { useAuthStore } from "@/store/auth-store";
 import { Eye, EyeOff, RefreshCw, X } from "lucide-react";
@@ -30,7 +30,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
   const actor = useAuthStore((s) => s.user);
   const actorRole = actor?.role;
   const actorRoleLabel = roleDisplayLabel(actor?.role, actor?.roleLabel);
-  const allowPasswordResetFlag = canSetPasswordResetRequirement(actorRole);
   const [mounted, setMounted] = useState(false);
   const [roles, setRoles] = useState<RoleOption[]>(() =>
     creatableRoleOptions(actorRole),
@@ -38,9 +37,9 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("LEAD_ANALYST");
+  const [teamName, setTeamName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [mustReset, setMustReset] = useState(false);
   const {
     phase: submitPhase,
     start: startSubmit,
@@ -63,9 +62,9 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
     setName(user.name);
     setEmail(user.email);
     setRole(user.role);
+    setTeamName(user.analystTeamName?.trim() || user.teamName?.trim() || "");
     setPassword("");
     setShowPassword(false);
-    setMustReset(user.mustResetPassword);
     setError(null);
     setFieldErrors({});
     resetSubmit();
@@ -101,6 +100,9 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
 
   if (!mounted || !open || !user) return null;
 
+  const showAnalystTeam =
+    role === Role.AnalystTeamLead || isLeadAnalyst(role);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (submitting || !user) return;
@@ -115,8 +117,8 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
         role,
         password: password.trim() ? password : null,
       };
-      if (allowPasswordResetFlag) {
-        payload.mustResetPassword = mustReset;
+      if (showAnalystTeam) {
+        payload.teamName = teamName.trim();
       }
       const result = await updateUserRequest(targetId, payload);
       if (!openRef.current || userIdRef.current !== targetId) return;
@@ -263,26 +265,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
             ) : null}
           </div>
 
-          {allowPasswordResetFlag ? (
-          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#fbfbfc] px-3 py-2.5">
-            <input
-              type="checkbox"
-              checked={mustReset}
-              disabled={submitting}
-              onChange={(e) => setMustReset(e.target.checked)}
-              className="mt-0.5 h-3.5 w-3.5 accent-[#e86812]"
-            />
-            <span>
-              <span className="block text-[13px] font-medium text-[#212529]">
-                Require password reset on next login
-              </span>
-              <span className="mt-0.5 block text-[11px] text-[#868e96]">
-                Marks the account so the user should change this password.
-              </span>
-            </span>
-          </label>
-          ) : null}
-
           <div>
             <p
               id="edit-user-role-label"
@@ -322,6 +304,40 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
               <p className="mt-1 text-[11px] text-[#c92a2a]">{fieldErrors.role}</p>
             ) : null}
           </div>
+
+          {showAnalystTeam ? (
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+                Team name
+              </label>
+              <input
+                className={inputClass}
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                required={role === Role.AnalystTeamLead}
+                minLength={2}
+                maxLength={120}
+                disabled={submitting}
+                placeholder={
+                  role === Role.AnalystTeamLead
+                    ? "e.g. Qualification Pod A"
+                    : "Optional analyst team"
+                }
+                autoComplete="organization"
+              />
+              {fieldErrors.teamName ? (
+                <p className="mt-1 text-[11px] text-[#c92a2a]">
+                  {fieldErrors.teamName}
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-[#adb5bd]">
+                  {role === Role.AnalystTeamLead
+                    ? "This Analyst Team Lead is the lead of this team"
+                    : "Assign this Lead Analyst to an analyst team"}
+                </p>
+              )}
+            </div>
+          ) : null}
 
           {error ? (
             <p className="rounded-lg border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-3 py-2 text-[12px] text-[#c92a2a]">

@@ -52,13 +52,15 @@ function sizeBasedOrangeShade(
 }
 
 function buildSlices(mix: TeamLeadCount[] | null | undefined, total: number): Slice[] {
-  const rows = Array.isArray(mix) ? mix.filter((item) => item && item.count > 0) : [];
+  const rows = Array.isArray(mix)
+    ? mix.filter((item) => item && item.count > 0 && (item.id ?? "").trim())
+    : [];
   const sum = rows.reduce((acc, item) => acc + item.count, 0) || Math.max(total, 1);
 
-  const slices = rows.map((item, index) => {
-    const label = (item.name ?? "").trim() || "Unassigned";
-    const id = (item.id ?? "").trim() || "none";
-    const key = item.id ? `team:${item.id}` : `team:unassigned:${label}:${index}`;
+  const slices = rows.map((item) => {
+    const label = (item.name ?? "").trim() || "Unnamed";
+    const id = (item.id ?? "").trim();
+    const key = `team:${id}`;
     return {
       key,
       id,
@@ -365,7 +367,9 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
 
   const openTeam = useCallback(
     (slice: Slice) => {
-      navigateToLeads({ teamId: slice.id || "none" });
+      const teamId = slice.id?.trim();
+      if (!teamId) return;
+      navigateToLeads({ teamId });
     },
     [navigateToLeads],
   );
@@ -409,8 +413,8 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
     [slices, activeKey],
   );
 
-  const portfolioValue = active?.count ?? (total || sum);
-  const portfolioLabel = active?.label ?? "All teams";
+  const portfolioValue = active?.count ?? sum;
+  const portfolioLabel = active?.label ?? "Routed leads";
   const portfolioDetail = loading
     ? "Loading…"
     : active

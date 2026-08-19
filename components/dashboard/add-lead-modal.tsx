@@ -615,11 +615,11 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
       : form.portalSelect.trim();
 
     const payload: CreateLeadPayload = {
+      fullName: form.fullName.trim(),
       source: form.source,
       qualificationStatus: form.qualificationStatus,
       leadScore: form.leadScore,
     };
-    if (form.fullName.trim()) payload.fullName = form.fullName.trim();
     if (form.email.trim()) payload.email = form.email.trim();
     if (isMeaningfulPhone(form.phone)) {
       payload.phone = normalizeStoredPhone(

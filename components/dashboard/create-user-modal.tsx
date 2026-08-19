@@ -12,7 +12,9 @@ import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
   creatableRoleOptions,
   defaultCreateRole,
+  isAnalystTeamLead,
   roleDisplayLabel,
+  roleNeedsNamedTeam,
   Role,
 } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
@@ -63,7 +65,12 @@ export function CreateUserModal({
   const openRef = useRef(open);
   openRef.current = open;
 
-  const needsTeam = role === Role.MainTeamLead;
+  const actorAnalystTeam = actor?.analystTeamName?.trim() ?? "";
+  const inheritAnalystTeam =
+    isAnalystTeamLead(actorRole) &&
+    role === Role.LeadAnalyst &&
+    Boolean(actorAnalystTeam);
+  const needsTeam = roleNeedsNamedTeam(role);
 
   useEffect(() => setMounted(true), []);
 
@@ -115,7 +122,11 @@ export function CreateUserModal({
         email: email.trim(),
         password,
         role,
-        teamName: needsTeam ? teamName.trim() : undefined,
+        teamName: inheritAnalystTeam
+          ? actorAnalystTeam
+          : needsTeam
+            ? teamName.trim()
+            : undefined,
       });
       if (!openRef.current) return;
       onCreated(
@@ -281,7 +292,7 @@ export function CreateUserModal({
                     disabled={submitting}
                     onClick={() => {
                       setRole(option.value);
-                      if (option.value !== Role.MainTeamLead) {
+                      if (!roleNeedsNamedTeam(option.value)) {
                         setTeamName("");
                         setFieldErrors((prev) => {
                           const next = { ...prev };
@@ -346,7 +357,11 @@ export function CreateUserModal({
                   maxLength={120}
                   disabled={submitting || !needsTeam}
                   tabIndex={needsTeam ? 0 : -1}
-                  placeholder="e.g. Elite Closers"
+                  placeholder={
+                    role === Role.AnalystTeamLead
+                      ? "e.g. Qualification Pod A"
+                      : "e.g. Elite Closers"
+                  }
                   autoComplete="organization"
                 />
                 {fieldErrors.teamName ? (
@@ -355,7 +370,9 @@ export function CreateUserModal({
                   </p>
                 ) : (
                   <p className="mt-1 text-[11px] text-[#adb5bd]">
-                    Creates or links this Main Team Lead to a sales team
+                    {role === Role.AnalystTeamLead
+                      ? "Creates this Analyst Team Lead’s team"
+                      : "Creates or links this Main Team Lead to a sales team"}
                   </p>
                 )}
               </div>

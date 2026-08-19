@@ -8,7 +8,10 @@ import {
   type TimeBucketCount,
 } from "@/lib/api";
 import { addedBucketDeepLink } from "@/lib/leads-href";
-import { useDashboardFilterStore } from "@/store/dashboard-filter-store";
+import {
+  dashboardFiltersToScope,
+  useDashboardFilterStore,
+} from "@/store/dashboard-filter-store";
 
 type Granularity = "day" | "month";
 
@@ -212,8 +215,9 @@ function ChartCanvas({
 
 export function LeadsAddedChart() {
   const navigateToLeads = useNavigateToLeads();
-  const country = useDashboardFilterStore((s) => s.filters.country);
-  const city = useDashboardFilterStore((s) => s.filters.city);
+  const filters = useDashboardFilterStore((s) => s.filters);
+  const scope = dashboardFiltersToScope(filters);
+  const scopeKey = JSON.stringify(scope);
   const [granularity, setGranularity] = useState<Granularity>("day");
   const [data, setData] = useState<AddedSeriesResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,13 +226,7 @@ export function LeadsAddedChart() {
 
   const openBucket = (key: string) => {
     const link = addedBucketDeepLink(key);
-    if (link) {
-      navigateToLeads({
-        ...link,
-        country: country || undefined,
-        city: city || undefined,
-      });
-    }
+    if (link) navigateToLeads(link);
   };
 
   useEffect(() => {
@@ -237,8 +235,7 @@ export function LeadsAddedChart() {
     setError(null);
     void fetchLeadsAddedSeries({
       granularity,
-      country: country || undefined,
-      city: city || undefined,
+      ...scope,
       signal: controller.signal,
     })
       .then((result) => {
@@ -254,7 +251,7 @@ export function LeadsAddedChart() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [granularity, country, city]);
+  }, [granularity, scopeKey]);
 
   const items = useMemo(
     () => (Array.isArray(data?.items) ? data.items : []),

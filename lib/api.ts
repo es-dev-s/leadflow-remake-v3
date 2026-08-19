@@ -183,7 +183,12 @@ async function readApiError(
         if (item.field && item.message) fields[item.field] = item.message;
       }
     }
-    return new ApiError(body.error || fallback, res.status, fields);
+    const fieldMessages = Object.values(fields);
+    const message =
+      fieldMessages.length > 0
+        ? fieldMessages.join(". ")
+        : body.error || fallback;
+    return new ApiError(message, res.status, fields);
   } catch {
     return new ApiError(fallback, res.status);
   }
@@ -232,9 +237,12 @@ export type SalesExecOutcome = {
   id: string;
   name: string;
   assigned: number;
+  withTeamLead: number;
   withRep: number;
+  inProgress: number;
   won: number;
   lost: number;
+  other: number;
 };
 
 export type StatusReasonCount = {
@@ -873,14 +881,7 @@ export async function createLead(
     signal,
   });
   if (!res.ok) {
-    let message = `Failed to create lead (${res.status})`;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message);
+    throw await readApiError(res, "Failed to create lead");
   }
   return (await res.json()) as { id: string };
 }
@@ -916,37 +917,28 @@ export async function updateLead(
     signal,
   });
   if (!res.ok) {
-    let message = `Failed to update lead (${res.status})`;
-    try {
-      const body = (await res.json()) as { error?: string };
-      if (body.error) message = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message);
+    throw await readApiError(res, "Failed to update lead");
   }
   return (await res.json()) as { id: string; updated: boolean };
 }
 
-export async function fetchLeadsSummary(
-  params: {
-    country?: string;
-    city?: string;
-    filter?: string;
-    teamId?: string;
-    analystId?: string;
-    salesExecId?: string;
-    source?: string;
-    portal?: string;
-    metaProfile?: string;
-    status?: string;
-    stage?: string;
-    addedFrom?: string;
-    addedTo?: string;
-    signal?: AbortSignal;
-  } = {},
-): Promise<LeadSummary> {
-  const sp = new URLSearchParams();
+export type LeadScopeQuery = {
+  country?: string;
+  city?: string;
+  filter?: string;
+  teamId?: string;
+  analystId?: string;
+  salesExecId?: string;
+  source?: string;
+  portal?: string;
+  metaProfile?: string;
+  status?: string;
+  stage?: string;
+  addedFrom?: string;
+  addedTo?: string;
+};
+
+function appendLeadScopeParams(sp: URLSearchParams, params: LeadScopeQuery) {
   if (params.country) sp.set("country", params.country);
   if (params.city) sp.set("city", params.city);
   if (params.filter && params.filter !== "all") sp.set("filter", params.filter);
@@ -960,6 +952,13 @@ export async function fetchLeadsSummary(
   if (params.stage) sp.set("stage", params.stage);
   if (params.addedFrom) sp.set("addedFrom", params.addedFrom);
   if (params.addedTo) sp.set("addedTo", params.addedTo);
+}
+
+export async function fetchLeadsSummary(
+  params: LeadScopeQuery & { signal?: AbortSignal } = {},
+): Promise<LeadSummary> {
+  const sp = new URLSearchParams();
+  appendLeadScopeParams(sp, params);
   const qs = sp.toString();
   return getJSONCached<LeadSummary>(
     `/api/leads/summary${qs ? `?${qs}` : ""}`,
@@ -1114,20 +1113,17 @@ export async function fetchPipelineSummary(
   );
 }
 
-export async function fetchSummaryBuckets<T>(params: {
+export async function fetchSummaryBuckets<T>(params: LeadScopeQuery & {
   dimension: SummaryBucketDimension;
   status?: string;
-  country?: string;
-  city?: string;
   offset?: number;
   limit?: number;
   signal?: AbortSignal;
 }): Promise<SummaryBucketPage<T>> {
   const sp = new URLSearchParams();
   sp.set("dimension", params.dimension);
+  appendLeadScopeParams(sp, params);
   if (params.status) sp.set("status", params.status);
-  if (params.country) sp.set("country", params.country);
-  if (params.city) sp.set("city", params.city);
   if (params.offset != null) sp.set("offset", String(params.offset));
   if (params.limit != null) sp.set("limit", String(params.limit));
   const body = await getJSONCached<SummaryBucketPage<T>>(
@@ -1203,16 +1199,15 @@ export type AddedSeriesResponse = {
   average: number;
 };
 
-export async function fetchLeadsAddedSeries(params: {
-  granularity?: "day" | "month";
-  country?: string;
-  city?: string;
-  signal?: AbortSignal;
-} = {}): Promise<AddedSeriesResponse> {
+export async function fetchLeadsAddedSeries(
+  params: LeadScopeQuery & {
+    granularity?: "day" | "month";
+    signal?: AbortSignal;
+  } = {},
+): Promise<AddedSeriesResponse> {
   const sp = new URLSearchParams();
   if (params.granularity) sp.set("granularity", params.granularity);
-  if (params.country) sp.set("country", params.country);
-  if (params.city) sp.set("city", params.city);
+  appendLeadScopeParams(sp, params);
   const qs = sp.toString();
   return getJSONCached<AddedSeriesResponse>(
     `/api/leads/added-series${qs ? `?${qs}` : ""}`,
@@ -1374,6 +1369,7 @@ export async function updateUserRequest(
     email: string;
     role: string;
     password?: string | null;
+    teamName?: string | null;
     mustResetPassword?: boolean;
   },
   signal?: AbortSignal,
@@ -1385,6 +1381,9 @@ export async function updateUserRequest(
   };
   if (payload.password != null && payload.password.trim() !== "") {
     body.password = payload.password;
+  }
+  if (typeof payload.teamName === "string") {
+    body.teamName = payload.teamName.trim();
   }
   if (typeof payload.mustResetPassword === "boolean") {
     body.mustResetPassword = payload.mustResetPassword;

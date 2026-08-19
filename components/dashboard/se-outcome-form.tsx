@@ -82,9 +82,10 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
       if (revenue == null || Number.isNaN(revenue) || revenue <= 0) return false;
     }
     const payment = parseMoney(initialPayment);
-    if (Number.isNaN(payment)) return false;
+    if (payment != null && payment < 0) return false;
     const revenue = parseMoney(closedRevenue);
-    if (Number.isNaN(revenue)) return false;
+    if (revenue != null && revenue < 0) return false;
+    if (Number.isNaN(payment) || Number.isNaN(revenue)) return false;
     return true;
   }, [stage, closedRequiresRevenue, closedRevenue, initialPayment]);
 
@@ -98,6 +99,10 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
     }
     if (stage === "CLOSED_WON" && (revenue == null || revenue <= 0)) {
       setError("Closed revenue is required when outcome is Closed");
+      return;
+    }
+    if ((payment != null && payment < 0) || (revenue != null && revenue < 0)) {
+      setError("Amounts cannot be negative");
       return;
     }
 

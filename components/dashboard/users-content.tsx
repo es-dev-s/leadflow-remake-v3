@@ -563,13 +563,8 @@ export function UsersContent() {
                     </td>
                     <td className="px-2 py-2.5">
                       <p className="truncate text-[13px] text-[#212529]">
-                        {user.teamName || "—"}
+                        {user.teamName || user.analystTeamName || "—"}
                       </p>
-                      {user.analystTeamName ? (
-                        <p className="truncate text-[11px] text-[#868e96]">
-                          {user.analystTeamName}
-                        </p>
-                      ) : null}
                     </td>
                     <td className="px-2 py-2.5">
                       <span className="inline-flex items-center gap-1.5 text-[12px]">
