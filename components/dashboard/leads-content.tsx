@@ -135,16 +135,9 @@ function ColumnCell({
     case "lead":
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-[13px] font-medium text-[#212529]">
-              <HighlightText text={lead.leadLabel} query={searchQuery} />
-            </p>
-            {lead.isNew ? (
-              <span className="shrink-0 rounded-md bg-[#ebfbee] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#2b8a3e] uppercase">
-                New
-              </span>
-            ) : null}
-          </div>
+          <p className="truncate text-[13px] font-medium text-[#212529]">
+            <HighlightText text={lead.leadLabel} query={searchQuery} />
+          </p>
         </td>
       );
     case "analyst":
