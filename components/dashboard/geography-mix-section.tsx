@@ -202,8 +202,7 @@ export function GeographyMixSection({
     [rows],
   );
   const countryCount = useMemo(() => {
-    return rows.filter((row) => normalizeCountryKey(row.name) !== "unknown")
-      .length;
+    return rows.length
   }, [rows]);
 
   const activeRow = useMemo(() => {
