@@ -22,11 +22,16 @@ export default function ProfilePage() {
     );
   }
 
+  const managerName = user.managerName?.trim();
+  const hasManager = Boolean(user.managerId?.trim() || managerName);
+
   const rows: Array<{ label: string; value: string }> = [
     { label: "Email", value: user.email || "—" },
     { label: "Role", value: user.roleLabel || user.role || "—" },
     { label: "Team", value: user.teamName || "—" },
-    { label: "Manager", value: user.managerName || "—" },
+    ...(hasManager
+      ? [{ label: "Manager", value: managerName || "—" }]
+      : []),
     {
       label: "Session",
       value: user.isActiveSession ? "Online" : "Offline",
