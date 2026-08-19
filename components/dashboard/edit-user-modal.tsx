@@ -9,7 +9,7 @@ import {
   type RoleOption,
 } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
-import { creatableRoleOptions } from "@/lib/roles";
+import { creatableRoleOptions, roleDisplayLabel } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { useAuthStore } from "@/store/auth-store";
 import { Eye, EyeOff, RefreshCw, X } from "lucide-react";
@@ -27,7 +27,9 @@ const inputClass =
   "h-11 w-full rounded-xl border border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] px-3.5 text-[13px] text-[#212529] outline-none transition-[border-color,box-shadow] placeholder:text-[#adb5bd] focus:border-[rgba(232,104,18,0.5)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(232,104,18,0.1)]";
 
 export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
-  const actorRole = useAuthStore((s) => s.user?.role);
+  const actor = useAuthStore((s) => s.user);
+  const actorRole = actor?.role;
+  const actorRoleLabel = roleDisplayLabel(actor?.role, actor?.roleLabel);
   const [mounted, setMounted] = useState(false);
   const [roles, setRoles] = useState<RoleOption[]>(() =>
     creatableRoleOptions(actorRole),
@@ -144,7 +146,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
         <div className="flex items-start justify-between gap-3 border-b border-[rgba(33,37,41,0.06)] px-5 py-4">
           <div>
             <p className="text-[10px] font-medium tracking-[0.12em] text-[#9a3f00] uppercase">
-              Superadmin
+              {actorRoleLabel}
             </p>
             <h2 className="mt-1 text-[16px] font-medium tracking-[-0.02em] text-[#212529]">
               Edit user

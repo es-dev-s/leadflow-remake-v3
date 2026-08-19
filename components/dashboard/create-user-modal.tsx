@@ -12,6 +12,7 @@ import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
   creatableRoleOptions,
   defaultCreateRole,
+  roleDisplayLabel,
   Role,
 } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
@@ -37,7 +38,9 @@ export function CreateUserModal({
   onCreated,
   preferredRole,
 }: Props) {
-  const actorRole = useAuthStore((s) => s.user?.role);
+  const actor = useAuthStore((s) => s.user);
+  const actorRole = actor?.role;
+  const actorRoleLabel = roleDisplayLabel(actor?.role, actor?.roleLabel);
   const fallbackRoles = creatableRoleOptions(actorRole);
   const [mounted, setMounted] = useState(false);
   const [roles, setRoles] = useState<RoleOption[]>(fallbackRoles);
@@ -148,7 +151,7 @@ export function CreateUserModal({
         <div className="flex items-start justify-between gap-3 border-b border-[rgba(33,37,41,0.06)] px-5 py-4">
           <div>
             <p className="text-[10px] font-medium tracking-[0.12em] text-[#9a3f00] uppercase">
-              Superadmin
+              {actorRoleLabel}
             </p>
             <h2 className="mt-1 text-[16px] font-medium tracking-[-0.02em] text-[#212529]">
               Create user

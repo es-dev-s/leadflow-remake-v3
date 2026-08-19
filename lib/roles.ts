@@ -51,6 +51,23 @@ export function isSalesExecutive(role: string | null | undefined) {
   return role === Role.SalesExecutive;
 }
 
+/** Human-readable label for a role id (prefers API-provided roleLabel). */
+export function roleDisplayLabel(
+  role: string | null | undefined,
+  roleLabel?: string | null,
+): string {
+  const fromApi = roleLabel?.trim();
+  if (fromApi) return fromApi;
+  const match = ALL_ROLE_OPTIONS.find((option) => option.value === role);
+  if (match) return match.label;
+  if (!role) return "User";
+  return role
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function isSupport(role: string | null | undefined) {
   return role === Role.Support;
 }
