@@ -14,13 +14,14 @@ export function GlobalFilterHost() {
   const role = useAuthStore((s) => s.user?.role);
   const closeFilterSidebar = useUiStore((s) => s.closeFilterSidebar);
   const onLeads = pathname === "/leads" || pathname.startsWith("/leads/");
+  const onProfile = pathname === "/profile" || pathname.startsWith("/profile/");
 
   // Avoid carrying an open panel across routes with different filter models.
   useEffect(() => {
     closeFilterSidebar();
   }, [pathname, closeFilterSidebar]);
 
-  if (!canViewLeadData(role)) {
+  if (!canViewLeadData(role) || onProfile) {
     return null;
   }
 
