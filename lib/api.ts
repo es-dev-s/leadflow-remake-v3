@@ -1180,16 +1180,23 @@ export async function fetchGeoOptions(params: {
   country?: string;
   signal?: AbortSignal;
 } = {}): Promise<GeoOptionsResponse> {
+  const expectedType = params.type ?? "countries";
   const sp = new URLSearchParams();
-  if (params.type) sp.set("type", params.type);
+  sp.set("type", expectedType);
   if (params.country) sp.set("country", params.country);
   const qs = sp.toString();
-  return getJSONCached<GeoOptionsResponse>(
-    `/api/leads/geo-options${qs ? `?${qs}` : ""}`,
+  const data = await getJSONCached<GeoOptionsResponse>(
+    `/api/leads/geo-options?${qs}`,
     60_000,
     params.signal,
     "Failed to load geo options",
   );
+  if (data.type && data.type !== expectedType) {
+    throw new Error(
+      `Geo options type mismatch: expected ${expectedType}, got ${data.type}`,
+    );
+  }
+  return data;
 }
 
 export type TimeBucketCount = {

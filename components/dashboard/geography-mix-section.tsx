@@ -16,6 +16,7 @@ import {
   normalizeCountryKey,
   toMapCountryName,
 } from "@/lib/country-map";
+import { filterCityGeoOptions } from "@/lib/lead-filter-labels";
 import {
   fetchGeoOptions,
   fetchGeographyMix,
@@ -67,6 +68,7 @@ export function GeographyMixSection({
   const city = controlled ? (cityProp ?? "") : localCity;
   const [countries, setCountries] = useState<NamedCount[]>([]);
   const [cities, setCities] = useState<NamedCount[]>([]);
+  const [citiesLoading, setCitiesLoading] = useState(false);
 
   const [geographies, setGeographies] = useState<CountryFeature[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -74,9 +76,10 @@ export function GeographyMixSection({
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetchGeoOptions({ signal: controller.signal })
+    void fetchGeoOptions({ type: "countries", signal: controller.signal })
       .then((countryData) => {
         if (controller.signal.aborted) return;
+        if (countryData.type !== "countries") return;
         setCountries(countryData.items ?? []);
       })
       .catch(() => {
@@ -86,23 +89,40 @@ export function GeographyMixSection({
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
     const scopedCountry = country.trim();
+    if (!scopedCountry) {
+      setCities([]);
+      setCitiesLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setCitiesLoading(true);
     void fetchGeoOptions({
       type: "cities",
-      country: scopedCountry || undefined,
+      country: scopedCountry,
       signal: controller.signal,
     })
       .then((cityData) => {
         if (controller.signal.aborted) return;
-        setCities(cityData.items ?? []);
+        if (cityData.type !== "cities") return;
+        setCities(
+          filterCityGeoOptions(
+            cityData.items ?? [],
+            countries,
+            scopedCountry,
+          ),
+        );
       })
       .catch(() => {
         if (controller.signal.aborted) return;
         setCities([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCitiesLoading(false);
       });
     return () => controller.abort();
-  }, [country]);
+  }, [country, countries]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -247,9 +267,11 @@ export function GeographyMixSection({
             />
             <GeoFilterSelect
               label="Filter by city"
-              placeholder="All cities"
+              placeholder={country.trim() ? "All cities" : "Select a country first"}
               value={city}
               options={cities}
+              disabled={!country.trim()}
+              loading={citiesLoading}
               onChange={(next) => {
                 if (controlled) {
                   setDashboardFilters({

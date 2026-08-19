@@ -19,6 +19,7 @@ import {
 } from "@/lib/lead-form-options";
 import {
   BLANK_GEO,
+  filterCityGeoOptions,
   LEAD_STAGE_OPTIONS,
   leadPresetOptionsForRole,
   mergeExternalFilters,
@@ -292,7 +293,10 @@ export function LeadFilterSidebar() {
     })
       .then((geo) => {
         if (controller.signal.aborted) return;
-        setCities(geo.items ?? []);
+        if (geo.type !== "cities") return;
+        setCities(
+          filterCityGeoOptions(geo.items ?? [], countries, country),
+        );
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
@@ -304,7 +308,7 @@ export function LeadFilterSidebar() {
       });
 
     return () => controller.abort();
-  }, [open, draft.facets.country]);
+  }, [open, draft.facets.country, countries]);
 
   const patchFacet = <K extends keyof LeadFacets>(
     key: K,

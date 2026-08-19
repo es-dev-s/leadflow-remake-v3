@@ -66,6 +66,27 @@ export function isBlankGeoValue(value: string | null | undefined) {
   return v === "unknown" || v === "none" || v === "unassigned" || v === "blank";
 }
 
+/** Remove country names that were incorrectly stored in the city field. */
+export function filterCityGeoOptions(
+  cities: Array<{ name: string; count: number }>,
+  countries: Array<{ name: string; count: number }>,
+  selectedCountry?: string,
+) {
+  const countryKeys = new Set<string>();
+  for (const item of countries) {
+    const key = item.name.trim().toLowerCase();
+    if (key && !isBlankGeoValue(key)) countryKeys.add(key);
+  }
+  const selected = selectedCountry?.trim().toLowerCase();
+  if (selected && !isBlankGeoValue(selected)) countryKeys.add(selected);
+
+  return cities.filter((city) => {
+    const key = city.name.trim().toLowerCase();
+    if (!key || isBlankGeoValue(key)) return false;
+    return !countryKeys.has(key);
+  });
+}
+
 export function presetLabel(id: string | null | undefined) {
   const match =
     LEAD_PRESET_OPTIONS.find((o) => o.id === id) ??
