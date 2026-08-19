@@ -4,19 +4,8 @@ import { showActionToast } from "@/store/action-toast-store";
 import { Check, LoaderCircle, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FilterPanelShell } from "@/components/dashboard/filter-panel-shell";
-import {
-  fetchAssignableUsers,
-  fetchGeoOptions,
-  fetchSummaryBuckets,
-  type AssignableUser,
-  type AnalystLeadStats,
-  type NamedCount,
-} from "@/lib/api";
-import {
-  LEAD_SOURCES,
-  PORTAL_WEBSITES,
-  QUALIFICATION_OPTIONS,
-} from "@/lib/lead-form-options";
+import { loadLeadFilterOptions } from "@/lib/lead-filter-options";
+import { QUALIFICATION_OPTIONS } from "@/lib/lead-form-options";
 import {
   BLANK_GEO,
   filterCityGeoOptions,
@@ -26,12 +15,16 @@ import {
   normalizeDateRange,
 } from "@/lib/lead-filter-labels";
 import {
+  facetsToDeepLink,
   type LeadFacets,
   useLeadsStore,
 } from "@/store/leads-store";
 import { useUiStore } from "@/store/ui-store";
 import { isAssigneeScoped, isCreatorScoped, isTeamScoped } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { fetchGeoOptions, type NamedCount } from "@/lib/api";
+import { buildLeadsHref } from "@/lib/leads-href";
+import { useRouter } from "next/navigation";
 
 const STAGE_OPTIONS = LEAD_STAGE_OPTIONS;
 
@@ -134,20 +127,8 @@ function draftsEqual(a: Draft, b: Draft) {
   );
 }
 
-function uniqueTeams(users: AssignableUser[]) {
-  const map = new Map<string, string>();
-  for (const user of users) {
-    const id = user.teamId?.trim();
-    if (!id) continue;
-    const name = user.teamName?.trim() || id;
-    if (!map.has(id)) map.set(id, name);
-  }
-  return [...map.entries()]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export function LeadFilterSidebar() {
+  const router = useRouter();
   const open = useUiStore((s) => s.filterSidebarOpen);
   const closeFilterSidebar = useUiStore((s) => s.closeFilterSidebar);
   const filterValue = useLeadsStore((s) => s.filterValue);
@@ -172,7 +153,11 @@ export function LeadFilterSidebar() {
   const [analysts, setAnalysts] = useState<
     Array<{ id: string; name: string }>
   >([]);
-  const [salesExecs, setSalesExecs] = useState<AssignableUser[]>([]);
+  const [salesExecs, setSalesExecs] = useState<Array<{ id: string; name: string }>>(
+    [],
+  );
+  const [sources, setSources] = useState<string[]>([]);
+  const [portals, setPortals] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
@@ -223,46 +208,26 @@ export function LeadFilterSidebar() {
     const controller = new AbortController();
     setOptionsLoading(true);
 
-    const emptyUsers: AssignableUser[] = [];
-    const emptyAnalysts = { items: [] as AnalystLeadStats[] };
-
-    void Promise.all([
-      fetchGeoOptions({ type: "countries", signal: controller.signal }),
-      hideTeamFilter
-        ? Promise.resolve(emptyUsers)
-        : fetchAssignableUsers("team-leads", controller.signal),
-      assigneeScoped
-        ? Promise.resolve(emptyUsers)
-        : fetchAssignableUsers("members", controller.signal),
-      hideAnalystFilter
-        ? Promise.resolve(emptyAnalysts)
-        : fetchSummaryBuckets<AnalystLeadStats>({
-            dimension: "analyst",
-            limit: 200,
-            signal: controller.signal,
-          }),
-    ])
-      .then(([geo, teamLeads, members, analystsPage]) => {
+    void loadLeadFilterOptions({
+      hideTeam: hideTeamFilter,
+      hideAnalyst: hideAnalystFilter,
+      hideSalesExec: assigneeScoped,
+      signal: controller.signal,
+    })
+      .then((opts) => {
         if (controller.signal.aborted) return;
         setOptionsLoaded(true);
-        setCountries(geo.items ?? []);
-        setTeams(uniqueTeams(teamLeads));
-        setSalesExecs(
-          [...members].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        setAnalysts(
-          (analystsPage.items ?? [])
-            .filter((row) => row.id)
-            .map((row) => ({
-              id: row.id,
-              name: row.name || row.email || row.id,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        setCountries(opts.countries);
+        setTeams(opts.teams);
+        setSalesExecs(opts.salesExecs);
+        setAnalysts(opts.analysts);
+        setSources(opts.sources);
+        setPortals(opts.portals);
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         console.error(err);
+        setOptionsLoaded(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setOptionsLoading(false);
@@ -345,6 +310,9 @@ export function LeadFilterSidebar() {
     baselineRef.current = next;
     setDraft(next);
     setAppliedFlash(true);
+    router.replace(buildLeadsHref(facetsToDeepLink(next.filterValue, next.facets)), {
+      scroll: false,
+    });
     showActionToast("Applied");
   };
 
@@ -354,6 +322,7 @@ export function LeadFilterSidebar() {
     baselineRef.current = empty;
     clearFacets();
     setAppliedFlash(false);
+    router.replace("/leads", { scroll: false });
   };
 
   return (
@@ -492,7 +461,7 @@ export function LeadFilterSidebar() {
                 >
                   <option value="">Any</option>
                   <option value="none">Blank</option>
-                  {LEAD_SOURCES.map((source) => (
+                  {sources.map((source) => (
                     <option key={source} value={source}>
                       {source}
                     </option>
@@ -505,7 +474,7 @@ export function LeadFilterSidebar() {
                 >
                   <option value="">Any</option>
                   <option value="none">Blank</option>
-                  {PORTAL_WEBSITES.map((portal) => (
+                  {portals.map((portal) => (
                     <option key={portal} value={portal}>
                       {portal}
                     </option>

@@ -27,6 +27,7 @@ export const EXTRA_LEAD_PRESET_OPTIONS = [
 ] as const;
 
 export const LEAD_STAGE_OPTIONS = [
+  { value: "PRE_SALES", label: "Pre-sales" },
   { value: "WITH_TEAM_LEAD", label: "With team lead" },
   { value: "WITH_EXECUTIVE", label: "With executive" },
   { value: "NOT_CONNECTED", label: "Not Connected" },

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isAbortError } from "@/lib/reset-client-state";
 import { fetchLeads } from "@/lib/api";
 import type { LeadRecord } from "@/lib/leads-data";
 import {
@@ -218,6 +219,26 @@ function facetParams(facets: LeadFacets) {
   };
 }
 
+export function facetsToDeepLink(filterValue: string, facets: LeadFacets): LeadsDeepLink {
+  return {
+    filter: filterValue !== "all" ? filterValue : undefined,
+    country: facets.country || undefined,
+    city: facets.city || undefined,
+    teamId: facets.teamId || undefined,
+    analystId: facets.analystId || undefined,
+    salesExecId: facets.salesExecId || undefined,
+    source: facets.source || undefined,
+    portal: facets.portal || undefined,
+    metaProfile: facets.metaProfile || undefined,
+    status: facets.status || undefined,
+    stage: facets.stage || undefined,
+    serviceLine: facets.serviceLine || undefined,
+    reason: facets.reason || undefined,
+    addedFrom: facets.addedFrom || undefined,
+    addedTo: facets.addedTo || undefined,
+  };
+}
+
 async function fetchFirstPage(
   get: () => LeadsState,
   set: (partial: Partial<LeadsState>) => void,
@@ -270,8 +291,8 @@ async function fetchFirstPage(
       error: null,
     });
   } catch (err) {
-    if (controller.signal.aborted) return;
     if (get().queryEpoch !== queryEpoch) return;
+    if (pageAbort !== controller) return;
     set({
       items: soft ? get().items : [],
       totalAvailable: soft ? get().totalAvailable : 0,
@@ -279,7 +300,11 @@ async function fetchFirstPage(
       hasMore: false,
       isInitialLoading: false,
       isQueryPending: false,
-      error: err instanceof Error ? err.message : "Failed to load leads",
+      error: isAbortError(err)
+        ? "Request timed out — try applying the filter again"
+        : err instanceof Error
+          ? err.message
+          : "Failed to load leads",
     });
   }
 }
@@ -423,7 +448,9 @@ export const useLeadsStore = create<LeadsState>()(
             facets: { ...EMPTY_FACETS },
           }),
         );
-        set({ appliedDeepLinkKey: "" });
+        set({
+          appliedDeepLinkKey: deepLinkKey(facetsToDeepLink("all", EMPTY_FACETS)),
+        });
         void fetchFirstPage(get, set, { soft: true });
       },
 
@@ -467,7 +494,9 @@ export const useLeadsStore = create<LeadsState>()(
             filterValue: nextFilter,
             facets: nextFacets,
           }),
-          appliedDeepLinkKey: "",
+          appliedDeepLinkKey: deepLinkKey(
+            facetsToDeepLink(nextFilter, nextFacets),
+          ),
         });
         void fetchFirstPage(get, set, { soft: true });
       },
@@ -991,7 +1020,6 @@ export const useLeadsStore = create<LeadsState>()(
       partialize: (state) => ({
         visibleColumns: state.visibleColumns,
         showStatistics: state.showStatistics,
-        filterValue: state.filterValue,
         sortValue: state.sortValue,
         pageSize: state.pageSize,
       }),
@@ -1001,33 +1029,15 @@ export const useLeadsStore = create<LeadsState>()(
           raw.visibleColumns && typeof raw.visibleColumns === "object"
             ? raw.visibleColumns
             : {};
-        // Prefer newest (indexed createdAt). Keep an explicit user choice as-is.
         const persistedSort =
           typeof raw.sortValue === "string" ? raw.sortValue.trim() : "";
         const sortValue = persistedSort || DEFAULT_SORT;
         return {
           ...current,
-          ...raw,
           visibleColumns: {
             ...DEFAULT_VISIBLE_COLUMNS,
             ...persistedColumns,
           },
-          selectedById: {},
-          selectedCount: 0,
-          items: [],
-          totalAvailable: 0,
-          nextCursor: "",
-          hasMore: false,
-          queryEpoch: 0,
-          isInitialLoading: true,
-          isLoadingMore: false,
-          isQueryPending: true,
-          error: null,
-          searchQuery: "",
-          searchField: "",
-          searchBarOpen: false,
-          facets: { ...EMPTY_FACETS },
-          appliedDeepLinkKey: "",
           sortValue,
           pageSize:
             typeof raw.pageSize === "number" && raw.pageSize > 0

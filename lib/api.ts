@@ -148,13 +148,22 @@ async function getJSONCached<T>(
   signal: AbortSignal | undefined,
   errorLabel: string,
 ): Promise<T> {
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
   const cached = readQueryCache<T>(path, ttlMs);
   if (cached !== undefined) return cached;
   const res = await apiFetch(path, { signal });
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
   if (!res.ok) {
     throw new Error(`${errorLabel} (${res.status})`);
   }
   const data = (await res.json()) as T;
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
   writeQueryCache(path, data);
   return data;
 }
@@ -429,7 +438,7 @@ export async function fetchBackendHealth(
 
 function buildLeadsSearchParams(params: FetchLeadsParams): URLSearchParams {
   const sp = new URLSearchParams();
-  if (params.filter) sp.set("filter", params.filter);
+  if (params.filter && params.filter !== "all") sp.set("filter", params.filter);
   if (params.sort) sp.set("sort", params.sort);
   if (params.q) sp.set("q", params.q);
   if (params.field) sp.set("field", params.field);

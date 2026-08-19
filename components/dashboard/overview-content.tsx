@@ -20,6 +20,7 @@ import {
 import { usePersistedOverviewScroll } from "@/hooks/use-persisted-overview-scroll";
 import { fetchLeadsSummary, type LeadSummary } from "@/lib/api";
 import { formatFacetChips } from "@/lib/lead-filter-labels";
+import { isAbortError } from "@/lib/reset-client-state";
 import type { LeadsDeepLink } from "@/lib/leads-href";
 import {
   canViewLeadData,
@@ -90,6 +91,7 @@ export function OverviewContent() {
       return;
     }
     const controller = new AbortController();
+    let cancelled = false;
     setLoading(true);
     void fetchLeadsSummary({
       country: filters.country || undefined,
@@ -110,18 +112,21 @@ export function OverviewContent() {
       signal: controller.signal,
     })
       .then((data) => {
-        if (controller.signal.aborted) return;
+        if (cancelled) return;
         setSummary(data);
         setError(null);
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
+        if (cancelled || isAbortError(err)) return;
         setError(err instanceof Error ? err.message : "Failed to load summary");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!cancelled) setLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [filterKey, role, filters.country, filters.city, filters.filterValue, filters.teamId, filters.analystId, filters.salesExecId, filters.source, filters.portal, filters.status, filters.stage, filters.addedFrom, filters.addedTo]);
 
   const activeChips = useMemo(

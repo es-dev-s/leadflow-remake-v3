@@ -4,25 +4,16 @@ import { showActionToast } from "@/store/action-toast-store";
 import { Check, ExternalLink, LoaderCircle, RotateCcw, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FilterPanelShell } from "@/components/dashboard/filter-panel-shell";
-import {
-  fetchAssignableUsers,
-  fetchGeoOptions,
-  fetchSummaryBuckets,
-  type AssignableUser,
-  type AnalystLeadStats,
-  type NamedCount,
-} from "@/lib/api";
-import {
-  LEAD_SOURCES,
-  PORTAL_WEBSITES,
-  QUALIFICATION_OPTIONS,
-} from "@/lib/lead-form-options";
+import { loadLeadFilterOptions } from "@/lib/lead-filter-options";
+import { QUALIFICATION_OPTIONS } from "@/lib/lead-form-options";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import {
+  BLANK_GEO,
   filterCityGeoOptions,
   LEAD_STAGE_OPTIONS,
   leadPresetOptionsForRole,
   mergeExternalFilters,
+  normalizeDateRange,
 } from "@/lib/lead-filter-labels";
 import {
   EMPTY_DASHBOARD_FILTERS,
@@ -34,6 +25,7 @@ import {
 import { useUiStore } from "@/store/ui-store";
 import { isAssigneeScoped, isCreatorScoped, isTeamScoped } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { fetchGeoOptions, type NamedCount } from "@/lib/api";
 
 const STAGE_OPTIONS = LEAD_STAGE_OPTIONS;
 
@@ -97,19 +89,6 @@ function TextField({
   );
 }
 
-function uniqueTeams(users: AssignableUser[]) {
-  const map = new Map<string, string>();
-  for (const user of users) {
-    const id = user.teamId?.trim();
-    if (!id) continue;
-    const name = user.teamName?.trim() || id;
-    if (!map.has(id)) map.set(id, name);
-  }
-  return [...map.entries()]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 function draftsEqual(a: DashboardFilters, b: DashboardFilters) {
   return (Object.keys(EMPTY_DASHBOARD_FILTERS) as (keyof DashboardFilters)[]).every(
     (key) => a[key] === b[key],
@@ -143,7 +122,11 @@ export function DashboardFilterSidebar() {
   const [analysts, setAnalysts] = useState<Array<{ id: string; name: string }>>(
     [],
   );
-  const [salesExecs, setSalesExecs] = useState<AssignableUser[]>([]);
+  const [salesExecs, setSalesExecs] = useState<Array<{ id: string; name: string }>>(
+    [],
+  );
+  const [sources, setSources] = useState<string[]>([]);
+  const [portals, setPortals] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [optionsLoaded, setOptionsLoaded] = useState(false);
@@ -177,46 +160,26 @@ export function DashboardFilterSidebar() {
     const controller = new AbortController();
     setOptionsLoading(true);
 
-    const emptyUsers: AssignableUser[] = [];
-    const emptyAnalysts = { items: [] as AnalystLeadStats[] };
-
-    void Promise.all([
-      fetchGeoOptions({ type: "countries", signal: controller.signal }),
-      hideTeamFilter
-        ? Promise.resolve(emptyUsers)
-        : fetchAssignableUsers("team-leads", controller.signal),
-      assigneeScoped
-        ? Promise.resolve(emptyUsers)
-        : fetchAssignableUsers("members", controller.signal),
-      hideAnalystFilter
-        ? Promise.resolve(emptyAnalysts)
-        : fetchSummaryBuckets<AnalystLeadStats>({
-            dimension: "analyst",
-            limit: 200,
-            signal: controller.signal,
-          }),
-    ])
-      .then(([geo, teamLeads, members, analystsPage]) => {
+    void loadLeadFilterOptions({
+      hideTeam: hideTeamFilter,
+      hideAnalyst: hideAnalystFilter,
+      hideSalesExec: assigneeScoped,
+      signal: controller.signal,
+    })
+      .then((opts) => {
         if (controller.signal.aborted) return;
         setOptionsLoaded(true);
-        setCountries(geo.items ?? []);
-        setTeams(uniqueTeams(teamLeads));
-        setSalesExecs(
-          [...members].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        setAnalysts(
-          (analystsPage.items ?? [])
-            .filter((row) => row.id)
-            .map((row) => ({
-              id: row.id,
-              name: row.name || row.email || row.id,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        );
+        setCountries(opts.countries);
+        setTeams(opts.teams);
+        setSalesExecs(opts.salesExecs);
+        setAnalysts(opts.analysts);
+        setSources(opts.sources);
+        setPortals(opts.portals);
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         console.error(err);
+        setOptionsLoaded(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setOptionsLoading(false);
@@ -292,13 +255,21 @@ export function DashboardFilterSidebar() {
         if (!value) next.salesExecName = "";
         else if (value === "none") next.salesExecName = "Unassigned";
       }
+      if (key === "addedFrom" || key === "addedTo") {
+        const range = normalizeDateRange(next.addedFrom, next.addedTo);
+        next.addedFrom = range.addedFrom;
+        next.addedTo = range.addedTo;
+      }
       return next;
     });
   };
 
   const handleApply = () => {
-    setFilters(draft);
-    baselineRef.current = { ...draft };
+    const range = normalizeDateRange(draft.addedFrom, draft.addedTo);
+    const next = { ...draft, ...range };
+    setFilters(next);
+    setDraft(next);
+    baselineRef.current = { ...next };
     setAppliedFlash(true);
     showActionToast("Applied");
   };
@@ -311,9 +282,12 @@ export function DashboardFilterSidebar() {
   };
 
   const handleViewLeads = () => {
-    setFilters(draft);
-    baselineRef.current = { ...draft };
-    navigateToLeads(toDeepLink(draft));
+    const range = normalizeDateRange(draft.addedFrom, draft.addedTo);
+    const next = { ...draft, ...range };
+    setFilters(next);
+    setDraft(next);
+    baselineRef.current = { ...next };
+    navigateToLeads(toDeepLink(next));
   };
 
   const summaryBits = useMemo(() => {
@@ -383,6 +357,7 @@ export function DashboardFilterSidebar() {
                   onChange={(value) => patch("country", value)}
                 >
                   <option value="">Any</option>
+                  <option value={BLANK_GEO}>Blank</option>
                   {countries.map((item) => (
                     <option key={item.name} value={item.name}>
                       {item.name}
@@ -398,6 +373,7 @@ export function DashboardFilterSidebar() {
                   <option value="">
                     {citiesLoading ? "Loading…" : "Any"}
                   </option>
+                  <option value={BLANK_GEO}>Blank</option>
                   {cities.map((item) => (
                     <option key={item.name} value={item.name}>
                       {item.name}
@@ -452,7 +428,8 @@ export function DashboardFilterSidebar() {
                   onChange={(value) => patch("source", value)}
                 >
                   <option value="">Any</option>
-                  {LEAD_SOURCES.map((source) => (
+                  <option value="none">Blank</option>
+                  {sources.map((source) => (
                     <option key={source} value={source}>
                       {source}
                     </option>
@@ -464,7 +441,8 @@ export function DashboardFilterSidebar() {
                   onChange={(value) => patch("portal", value)}
                 >
                   <option value="">Any</option>
-                  {PORTAL_WEBSITES.map((portal) => (
+                  <option value="none">Blank</option>
+                  {portals.map((portal) => (
                     <option key={portal} value={portal}>
                       {portal}
                     </option>
