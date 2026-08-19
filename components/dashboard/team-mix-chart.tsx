@@ -1,7 +1,7 @@
 "use client";
 
 import { LayoutGrid, List } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   dashboardCardListClass,
   ViewMoreFooter,
@@ -22,22 +22,40 @@ type Slice = {
 
 type ViewMode = "grid" | "list";
 
-const TONES = [
-  "#ff7a1a",
-  "#343a40",
-  "#e86812",
-  "#495057",
-  "#f59e0b",
-  "#6c757d",
-  "#868e96",
-  "#212529",
-];
+/** Subtle orange blend: larger teams read slightly darker, all stay in-brand. */
+const ORANGE_SHADE_LIGHT = { r: 255, g: 205, b: 160 }; // #ffcda0
+const ORANGE_SHADE_DARK = { r: 232, g: 104, b: 18 }; // #e86812
+
+/** When one team dominates, cap its bar width so tail teams stay hoverable. */
+const DOMINANT_BAR_CAP_PCT = 28;
+const TAIL_SEGMENT_MIN_PX = 12;
+
+function sizeBasedOrangeShade(
+  pct: number,
+  minPct: number,
+  maxPct: number,
+): string {
+  const minV = Math.sqrt(Math.max(minPct, 0.001));
+  const maxV = Math.sqrt(Math.max(maxPct, 0.001));
+  const span = maxV - minV;
+  const t = span <= 0 ? 1 : (Math.sqrt(Math.max(pct, 0.001)) - minV) / span;
+  const r = Math.round(
+    ORANGE_SHADE_LIGHT.r + (ORANGE_SHADE_DARK.r - ORANGE_SHADE_LIGHT.r) * t,
+  );
+  const g = Math.round(
+    ORANGE_SHADE_LIGHT.g + (ORANGE_SHADE_DARK.g - ORANGE_SHADE_LIGHT.g) * t,
+  );
+  const b = Math.round(
+    ORANGE_SHADE_LIGHT.b + (ORANGE_SHADE_DARK.b - ORANGE_SHADE_LIGHT.b) * t,
+  );
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 function buildSlices(mix: TeamLeadCount[] | null | undefined, total: number): Slice[] {
   const rows = Array.isArray(mix) ? mix.filter((item) => item && item.count > 0) : [];
   const sum = rows.reduce((acc, item) => acc + item.count, 0) || Math.max(total, 1);
 
-  return rows.map((item, index) => {
+  const slices = rows.map((item, index) => {
     const label = (item.name ?? "").trim() || "Unassigned";
     const id = (item.id ?? "").trim() || "none";
     const key = item.id ? `team:${item.id}` : `team:unassigned:${label}:${index}`;
@@ -46,10 +64,21 @@ function buildSlices(mix: TeamLeadCount[] | null | undefined, total: number): Sl
       id,
       label,
       count: item.count,
-      tone: TONES[index % TONES.length]!,
+      tone: "",
       pct: (item.count / sum) * 100,
     };
   });
+
+  if (slices.length === 0) return slices;
+
+  const pcts = slices.map((slice) => slice.pct);
+  const minPct = Math.min(...pcts);
+  const maxPct = Math.max(...pcts);
+
+  return slices.map((slice) => ({
+    ...slice,
+    tone: sizeBasedOrangeShade(slice.pct, minPct, maxPct),
+  }));
 }
 
 function formatCount(value: number) {
@@ -58,6 +87,84 @@ function formatCount(value: number) {
 
 function formatPct(pct: number) {
   return pct < 1 ? pct.toFixed(2) : pct.toFixed(1);
+}
+
+type BarSegment = {
+  slice: Slice;
+  displayPct: number;
+  isTail: boolean;
+};
+
+function buildBarSegments(slices: Slice[]): BarSegment[] {
+  if (slices.length === 0) return [];
+  if (slices.length === 1) {
+    return [{ slice: slices[0]!, displayPct: 100, isTail: false }];
+  }
+
+  const maxPct = Math.max(...slices.map((slice) => slice.pct));
+  const dominantIdx = slices.findIndex((slice) => slice.pct === maxPct);
+  const skewed = maxPct >= 35 && slices.length > 2;
+
+  if (!skewed) {
+    const weights = slices.map((slice) => Math.max(slice.pct, 4));
+    const total = weights.reduce((acc, weight) => acc + weight, 0) || 1;
+    return slices.map((slice, index) => ({
+      slice,
+      displayPct: (weights[index]! / total) * 100,
+      isTail: false,
+    }));
+  }
+
+  const tailCount = slices.length - 1;
+  const tailShare = (100 - DOMINANT_BAR_CAP_PCT) / tailCount;
+
+  return slices.map((slice, index) => ({
+    slice,
+    displayPct: index === dominantIdx ? DOMINANT_BAR_CAP_PCT : tailShare,
+    isTail: index !== dominantIdx,
+  }));
+}
+
+function resolveSliceAtPosition(
+  segments: BarSegment[],
+  offsetX: number,
+  barWidth: number,
+): Slice | null {
+  if (barWidth <= 0 || segments.length === 0) return null;
+
+  const zones = segments.map((segment, index) => {
+    const sliceWidth = (segment.displayPct / 100) * barWidth;
+    const start = segments
+      .slice(0, index)
+      .reduce((acc, item) => acc + (item.displayPct / 100) * barWidth, 0);
+
+    return {
+      slice: segment.slice,
+      center: start + sliceWidth / 2,
+      hitWidth: Math.max(
+        sliceWidth,
+        segment.isTail ? TAIL_SEGMENT_MIN_PX : 8,
+      ),
+    };
+  });
+
+  const matches = zones.filter(
+    ({ center, hitWidth }) =>
+      offsetX >= center - hitWidth / 2 && offsetX <= center + hitWidth / 2,
+  );
+
+  if (matches.length === 1) return matches[0]!.slice;
+  if (matches.length > 1) {
+    return matches.reduce((best, row) =>
+      Math.abs(offsetX - row.center) < Math.abs(offsetX - best.center)
+        ? row
+        : best,
+    ).slice;
+  }
+
+  return zones.reduce((best, row) =>
+    Math.abs(offsetX - row.center) < Math.abs(offsetX - best.center) ? row : best,
+  ).slice;
 }
 
 function barWidth(pct: number) {
@@ -70,7 +177,7 @@ type Props = {
   loading?: boolean;
 };
 
-function GradientBar({
+function ShareBar({
   pct,
   tone,
   tall = false,
@@ -89,7 +196,7 @@ function GradientBar({
         className="h-full rounded-full"
         style={{
           width: `${barWidth(pct)}%`,
-          background: `linear-gradient(90deg, ${tone} 0%, #ff7a1a 55%, #ffc08a 100%)`,
+          backgroundColor: tone,
         }}
       />
     </div>
@@ -145,7 +252,7 @@ function TeamCard({
       </div>
 
       <div className="mt-3 space-y-1.5">
-        <GradientBar pct={slice.pct} tone={slice.tone} />
+        <ShareBar pct={slice.pct} tone={slice.tone} />
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-[#868e96]">Team share</span>
           <span className="text-[11px] font-medium tabular-nums text-[#495057]">
@@ -209,7 +316,7 @@ function TeamListRow({
       </div>
 
       <div className="min-w-0 sm:px-1">
-        <GradientBar pct={slice.pct} tone={slice.tone} tall />
+        <ShareBar pct={slice.pct} tone={slice.tone} tall />
       </div>
 
       <span className="hidden text-right text-[13px] font-medium tabular-nums text-[#212529] sm:block">
@@ -248,15 +355,49 @@ function PortfolioMetric({
 
 export function TeamMixChart({ mix, total, loading = false }: Props) {
   const navigateToLeads = useNavigateToLeads();
+  const barRef = useRef<HTMLDivElement>(null);
   const slices = useMemo(() => buildSlices(mix, total), [mix, total]);
+  const barSegments = useMemo(() => buildBarSegments(slices), [slices]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("grid");
   const previewLimit = view === "grid" ? 4 : 10;
   const more = useViewMore(slices, previewLimit);
 
-  const openTeam = (slice: Slice) => {
-    navigateToLeads({ teamId: slice.id || "none" });
-  };
+  const openTeam = useCallback(
+    (slice: Slice) => {
+      navigateToLeads({ teamId: slice.id || "none" });
+    },
+    [navigateToLeads],
+  );
+
+  const pickSliceFromBarPointer = useCallback(
+    (clientX: number) => {
+      const rect = barRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      return resolveSliceAtPosition(barSegments, clientX - rect.left, rect.width);
+    },
+    [barSegments],
+  );
+
+  const onBarPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const slice = pickSliceFromBarPointer(event.clientX);
+      setActiveKey(slice?.key ?? null);
+    },
+    [pickSliceFromBarPointer],
+  );
+
+  const onBarPointerLeave = useCallback(() => {
+    setActiveKey(null);
+  }, []);
+
+  const onBarClick = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const slice = pickSliceFromBarPointer(event.clientX);
+      if (slice) openTeam(slice);
+    },
+    [pickSliceFromBarPointer, openTeam],
+  );
 
   const sum = useMemo(
     () => slices.reduce((acc, slice) => acc + slice.count, 0) || total,
@@ -335,33 +476,34 @@ export function TeamMixChart({ mix, total, loading = false }: Props) {
           </div>
         </div>
 
-        {/* Spectrum track */}
+        {/* Spectrum track — dominant team capped; tail teams get equal thick segments */}
         <div className="shrink-0 rounded-2xl border border-[rgba(33,37,41,0.06)] bg-white p-3">
           <div
-            className="flex h-3 w-full overflow-hidden rounded-full bg-[rgba(33,37,41,0.05)]"
+            ref={barRef}
+            className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full bg-[rgba(33,37,41,0.05)]"
             role="img"
             aria-label="Team lead share bar"
+            onPointerMove={onBarPointerMove}
+            onPointerLeave={onBarPointerLeave}
+            onClick={onBarClick}
           >
-            {slices.map((slice) => {
-              const focused = !activeKey || activeKey === slice.key;
-              return (
-                <button
-                  key={`bar-${slice.key}`}
-                  type="button"
-                  title={`${slice.label}: ${formatCount(slice.count)} (${formatPct(slice.pct)}%)`}
-                  onMouseEnter={() => setActiveKey(slice.key)}
-                  onMouseLeave={() => setActiveKey(null)}
-                  onClick={() => openTeam(slice)}
-                  className="h-full min-w-0 border-0 p-0 transition-opacity duration-150"
-                  style={{
-                    flexGrow: Math.max(slice.pct, 0.2),
-                    flexBasis: 0,
-                    background: `linear-gradient(180deg, ${slice.tone}, #ff7a1a)`,
-                    opacity: focused ? 1 : 0.3,
-                  }}
-                />
-              );
-            })}
+            <div className="pointer-events-none flex h-full w-full gap-px">
+              {barSegments.map(({ slice, displayPct }) => {
+                const focused = !activeKey || activeKey === slice.key;
+                return (
+                  <div
+                    key={`bar-${slice.key}`}
+                    title={`${slice.label}: ${formatCount(slice.count)} (${formatPct(slice.pct)}%)`}
+                    className="h-full shrink-0 transition-opacity duration-150 first:rounded-l-full last:rounded-r-full"
+                    style={{
+                      flex: `${displayPct} 0 0`,
+                      backgroundColor: slice.tone,
+                      opacity: focused ? 1 : 0.35,
+                    }}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
 

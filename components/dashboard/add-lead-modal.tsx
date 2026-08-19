@@ -32,7 +32,7 @@ import {
   normalizeStoredPhone,
   phoneDigits,
 } from "@/lib/country-dial-codes";
-import { canChangeQualification, canEditLeadProfile } from "@/lib/roles";
+import { canChangeQualification, canCreateLeads, canEditLeadProfile } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { LoaderCircle, X } from "lucide-react";
@@ -254,6 +254,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   const allowQualify = canChangeQualification(role);
   const allowProfileEdit = canEditLeadProfile(role);
+  const allowCreate = canCreateLeads(role);
   const [mounted, setMounted] = useState(false);
   const [present, setPresent] = useState(false);
   const [entered, setEntered] = useState(false);
@@ -282,6 +283,12 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     setExistingPortals([]);
     setExistingSources([]);
   }
+
+  useEffect(() => {
+    if (open && !isEdit && !allowCreate) {
+      onClose();
+    }
+  }, [open, isEdit, allowCreate, onClose]);
 
   useEffect(() => {
     setMounted(true);
@@ -573,14 +580,24 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   const canSubmit = useMemo(() => {
     if (loading) return false;
     if (isEdit && !allowProfileEdit) return false;
+    if (!isEdit && !allowCreate) return false;
     if (!form.source) return false;
     if (!form.qualificationStatus) return false;
     if (portalIsOther && !form.portalOther.trim()) return false;
     if (Number.isNaN(firstResponseMinutes)) return false;
     return true;
-  }, [form, portalIsOther, loading, firstResponseMinutes, isEdit, allowProfileEdit]);
+  }, [
+    form,
+    portalIsOther,
+    loading,
+    firstResponseMinutes,
+    isEdit,
+    allowProfileEdit,
+    allowCreate,
+  ]);
 
   if (!mounted || !present) return null;
+  if (!isEdit && !allowCreate) return null;
 
   const set =
     <K extends keyof FormState>(key: K) =>
@@ -590,6 +607,8 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit || submitting) return;
+    if (!isEdit && !allowCreate) return;
+    if (isEdit && !allowProfileEdit) return;
 
     const portalWebsite = portalIsOther
       ? form.portalOther.trim()

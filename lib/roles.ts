@@ -51,6 +51,23 @@ export function isSalesExecutive(role: string | null | undefined) {
   return role === Role.SalesExecutive;
 }
 
+/** Human-readable label for a role id (prefers API-provided roleLabel). */
+export function roleDisplayLabel(
+  role: string | null | undefined,
+  roleLabel?: string | null,
+): string {
+  const fromApi = roleLabel?.trim();
+  if (fromApi) return fromApi;
+  const match = ALL_ROLE_OPTIONS.find((option) => option.value === role);
+  if (match) return match.label;
+  if (!role) return "User";
+  return role
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function isSupport(role: string | null | undefined) {
   return role === Role.Support;
 }
@@ -165,8 +182,23 @@ export function canMutateLeads(role: string | null | undefined) {
   );
 }
 
-/** Superadmin, ATL, and Lead Analyst may add leads. */
+/** Superadmin and ATL may require a password reset on next login. */
+export function canSetPasswordResetRequirement(
+  role: string | null | undefined,
+) {
+  return isSuperadmin(role) || isAnalystTeamLead(role);
+}
+
+/** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
 export function canCreateLeads(role: string | null | undefined) {
+  if (
+    !role ||
+    isMainTeamLead(role) ||
+    isSalesExecutive(role) ||
+    isSupport(role)
+  ) {
+    return false;
+  }
   return (
     isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
   );

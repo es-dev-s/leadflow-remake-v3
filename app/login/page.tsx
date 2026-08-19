@@ -33,6 +33,8 @@ function LoginForm() {
     return raw;
   }, [searchParams]);
 
+  const deactivatedNotice = searchParams.get("reason") === "inactive";
+
   useEffect(() => {
     // Always probe the HttpOnly cookie — no JWT in JS storage.
     const controller = new AbortController();
@@ -41,6 +43,7 @@ function LoginForm() {
       .then((user) => {
         if (controller.signal.aborted) return;
         setSession(COOKIE_SESSION, "", user);
+        (document.activeElement as HTMLElement | null)?.blur?.();
         router.replace(nextPath);
       })
       .catch((err: unknown) => {
@@ -71,6 +74,7 @@ function LoginForm() {
     try {
       const result = await loginRequest(cleanEmail, cleanPassword);
       setSession(COOKIE_SESSION, result.expiresAt, result.user);
+      (document.activeElement as HTMLElement | null)?.blur?.();
       router.replace(nextPath);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -161,6 +165,13 @@ function LoginForm() {
             </div>
           </div>
 
+          {deactivatedNotice ? (
+            <p className="mt-4 rounded-lg border border-[rgba(232,104,18,0.22)] bg-[#fff7ef] px-3 py-2 text-[12px] text-[#9a3f00]">
+              Your account was deactivated. Contact an administrator if you
+              need access restored.
+            </p>
+          ) : null}
+
           {error ? (
             <p className="mt-4 rounded-lg border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-3 py-2 text-[12px] text-[#c92a2a]">
               {error}
@@ -170,7 +181,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-5 flex h-11 w-full items-center justify-center rounded-xl bg-[#212529] text-[13px] font-medium text-white transition-opacity disabled:opacity-70"
+            className="mt-5 flex h-11 w-full items-center justify-center rounded-xl bg-[#212529] text-[13px] font-medium text-white outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-[#e86812]/35 focus-visible:ring-offset-2 disabled:opacity-70"
           >
             {submitting ? "Signing in…" : "Sign in"}
           </button>

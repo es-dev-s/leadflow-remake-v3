@@ -135,16 +135,9 @@ function ColumnCell({
     case "lead":
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="truncate text-[13px] font-medium text-[#212529]">
-              <HighlightText text={lead.leadLabel} query={searchQuery} />
-            </p>
-            {lead.isNew ? (
-              <span className="shrink-0 rounded-md bg-[#ebfbee] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] text-[#2b8a3e] uppercase">
-                New
-              </span>
-            ) : null}
-          </div>
+          <p className="truncate text-[13px] font-medium text-[#212529]">
+            <HighlightText text={lead.leadLabel} query={searchQuery} />
+          </p>
         </td>
       );
     case "analyst":
@@ -1176,6 +1169,21 @@ export function LeadsContent() {
   const closeLeadPreview = useUiStore((s) => s.closeLeadPreview);
   const openLeadPreview = useUiStore((s) => s.openLeadPreview);
 
+  const openCreateLead = useCallback(() => {
+    if (!allowCreate) return;
+    setEditingLeadId(null);
+    setLeadFormOpen(true);
+  }, [allowCreate]);
+
+  const openEditLead = useCallback(
+    (leadId: string) => {
+      closeLeadPreview();
+      setEditingLeadId(leadId);
+      setLeadFormOpen(true);
+    },
+    [closeLeadPreview],
+  );
+
   const setFilterValue = useLeadsStore((s) => s.setFilterValue);
   const setSortValue = useLeadsStore((s) => s.setSortValue);
   const visibleColumns = useLeadsStore((s) => s.visibleColumns);
@@ -1391,10 +1399,7 @@ export function LeadsContent() {
           {allowCreate ? (
             <button
               type="button"
-              onClick={() => {
-                setEditingLeadId(null);
-                setLeadFormOpen(true);
-              }}
+              onClick={openCreateLead}
               className="lf-pressable inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#212529] px-2.5 text-[13px] font-medium text-white hover:opacity-90 sm:px-3.5"
             >
               <Plus size={14} strokeWidth={1.5} />
@@ -1405,6 +1410,7 @@ export function LeadsContent() {
         </div>
       </div>
 
+      {(allowCreate || editingLeadId) && leadFormOpen ? (
       <AddLeadModal
         open={leadFormOpen}
         leadId={editingLeadId}
@@ -1429,6 +1435,7 @@ export function LeadsContent() {
           })();
         }}
       />
+      ) : null}
 
       <section className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-[rgba(33,37,41,0.06)] bg-white">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -1670,22 +1677,10 @@ export function LeadsContent() {
             </div>
           </div>
 
-          <SelectionBar
-            onEditLead={(leadId) => {
-              closeLeadPreview();
-              setEditingLeadId(leadId);
-              setLeadFormOpen(true);
-            }}
-          />
+          <SelectionBar onEditLead={openEditLead} />
         </div>
 
-        <LeadPreviewSidebar
-          onEdit={(leadId) => {
-            closeLeadPreview();
-            setEditingLeadId(leadId);
-            setLeadFormOpen(true);
-          }}
-        />
+        <LeadPreviewSidebar onEdit={openEditLead} />
       </section>
     </div>
   );

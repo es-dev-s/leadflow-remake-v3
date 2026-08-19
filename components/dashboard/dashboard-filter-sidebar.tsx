@@ -19,6 +19,7 @@ import {
 } from "@/lib/lead-form-options";
 import { useNavigateToLeads } from "@/hooks/use-navigate-to-leads";
 import {
+  filterCityGeoOptions,
   LEAD_STAGE_OPTIONS,
   leadPresetOptionsForRole,
   mergeExternalFilters,
@@ -246,7 +247,10 @@ export function DashboardFilterSidebar() {
     })
       .then((geo) => {
         if (controller.signal.aborted) return;
-        setCities(geo.items ?? []);
+        if (geo.type !== "cities") return;
+        setCities(
+          filterCityGeoOptions(geo.items ?? [], countries, country),
+        );
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
@@ -258,7 +262,7 @@ export function DashboardFilterSidebar() {
       });
 
     return () => controller.abort();
-  }, [open, draft.country]);
+  }, [open, draft.country, countries]);
 
   const patch = <K extends keyof DashboardFilters>(
     key: K,

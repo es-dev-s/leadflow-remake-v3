@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AnalystQualificationTable } from "@/components/dashboard/analyst-qualification-table";
 import { AttributionPerformanceSection } from "@/components/dashboard/attribution-performance-section";
@@ -23,6 +24,7 @@ import type { LeadsDeepLink } from "@/lib/leads-href";
 import { SupportDashboard } from "@/components/dashboard/support-dashboard";
 import {
   canViewLeadData,
+  canViewUsers,
   isAnalyticsScoped,
   isAssigneeScoped,
   isSuperadmin,
@@ -49,6 +51,7 @@ function formatRevenue(value: number | undefined) {
 }
 
 export function OverviewContent() {
+  const router = useRouter();
   const navigateToLeads = useNavigateToLeads();
   const scrollRef = usePersistedOverviewScroll();
   const role = useAuthStore((s) => s.user?.role);
@@ -168,10 +171,17 @@ export function OverviewContent() {
     value: string;
     detail?: string;
     link?: LeadsDeepLink;
+    href?: string;
   }> = [
     ...(analyticsScoped
       ? []
-      : [{ label: "Active users", value: formatCount(summary?.activeUsers) }]),
+      : [
+          {
+            label: "Active users",
+            value: formatCount(summary?.activeUsers),
+            href: canViewUsers(role) ? "/users" : undefined,
+          },
+        ]),
     {
       label: "Total leads",
       value: formatCount(summary?.leadsTotal),
@@ -237,7 +247,7 @@ export function OverviewContent() {
     <div
       ref={scrollRef}
       {...{ [OVERVIEW_SCROLL_ATTR]: "" }}
-      className="lf-scroll h-full min-h-0 overflow-y-auto overscroll-contain -mx-3 -my-3 px-3 py-3 sm:-mx-4 sm:-my-3.5 sm:px-4 sm:py-3.5 lg:-mx-6 lg:-my-4 lg:px-6 lg:py-4 2xl:-mx-8 2xl:px-8"
+      className="lf-scroll h-full min-h-0 overflow-y-auto overscroll-contain outline-none focus:outline-none -mx-3 -my-3 px-3 py-3 sm:-mx-4 sm:-my-3.5 sm:px-4 sm:py-3.5 lg:-mx-6 lg:-my-4 lg:px-6 lg:py-4 2xl:-mx-8 2xl:px-8"
     >
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 pb-8 2xl:gap-5">
         {activeChips.length > 0 ? (
@@ -264,7 +274,7 @@ export function OverviewContent() {
         ) : null}
 
         <div
-          className={`grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 ${
+          className={`grid w-full auto-rows-fr grid-cols-2 items-stretch gap-2 sm:grid-cols-3 lg:grid-cols-4 ${
             analyticsScoped ? "xl:grid-cols-6" : "xl:grid-cols-7"
           }`}
         >
@@ -275,13 +285,19 @@ export function OverviewContent() {
               value={card.value}
               detail={card.detail}
               compact
-              onClick={card.link ? () => open(card.link!) : undefined}
+              onClick={
+                card.link
+                  ? () => open(card.link!)
+                  : card.href
+                    ? () => router.push(card.href!)
+                    : undefined
+              }
             />
           ))}
         </div>
 
         <div
-          className={`grid w-full grid-cols-1 gap-3 ${
+          className={`grid w-full auto-rows-fr grid-cols-1 items-stretch gap-3 ${
             secondary.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
           }`}
         >

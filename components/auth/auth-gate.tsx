@@ -3,10 +3,11 @@
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, fetchMe } from "@/lib/api";
+import { ApiError, fetchMe, isInactiveAccountError } from "@/lib/api";
 import { COOKIE_SESSION, getAuthToken } from "@/lib/auth-token";
 import { readCachedUser, writeCachedUser } from "@/lib/auth-user-cache";
 import { isAbortError } from "@/lib/reset-client-state";
+import { subscribeRealtime } from "@/lib/realtime";
 import { useAuthStore } from "@/store/auth-store";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -65,10 +66,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const isUnauthorized =
-          err instanceof ApiError && err.status === 401;
+        const apiErr = err instanceof ApiError ? err : null;
+        const forceLogout =
+          apiErr?.status === 401 ||
+          (apiErr != null &&
+            isInactiveAccountError(apiErr.status, apiErr.message));
 
-        if (!isUnauthorized && useAuthStore.getState().user) {
+        if (!forceLogout && useAuthStore.getState().user) {
           markBootstrapped();
           setReady(true);
           return;
@@ -77,7 +81,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         markBootstrapped();
         writeCachedUser(null);
         clearSession();
-        router.replace("/login");
+        router.replace(
+          apiErr && isInactiveAccountError(apiErr.status, apiErr.message)
+            ? "/login?reason=inactive"
+            : "/login",
+        );
       })
       .finally(() => {
         window.clearTimeout(timeout);
@@ -95,6 +103,38 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     markBootstrapped,
     router,
   ]);
+
+  // Force logout when this account is deactivated while still logged in.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    return subscribeRealtime((evt) => {
+      if (evt.type !== "user.updated" || evt.userId !== user.id) return;
+
+      void fetchMe()
+        .then((me) => {
+          if (me.isActive === false) {
+            writeCachedUser(null);
+            clearSession();
+            router.replace("/login?reason=inactive");
+            return;
+          }
+          setUser(me);
+        })
+        .catch((err: unknown) => {
+          const apiErr = err instanceof ApiError ? err : null;
+          if (
+            apiErr?.status === 401 ||
+            (apiErr != null &&
+              isInactiveAccountError(apiErr.status, apiErr.message))
+          ) {
+            writeCachedUser(null);
+            clearSession();
+            router.replace("/login?reason=inactive");
+          }
+        });
+    });
+  }, [user?.id, clearSession, router, setUser]);
 
   if (!bootstrapped || !token || !user || !ready) {
     return (

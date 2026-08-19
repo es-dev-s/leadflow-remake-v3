@@ -239,6 +239,8 @@ export function Navbar() {
   }, [searchActive, searchField]);
 
   const onLeads = pathname === "/leads" || pathname.startsWith("/leads/");
+  const onProfile = pathname === "/profile" || pathname.startsWith("/profile/");
+  const showFilters = showLeadTools && !onProfile;
   const filtersActive = onLeads
     ? leadFilterValue !== "all" || Object.values(leadFacets).some(Boolean)
     : hasDashboardFilters(dashboardFilters);
@@ -301,6 +303,7 @@ export function Navbar() {
 
           {showLeadTools ? (
             <>
+          {showFilters ? (
           <button
             type="button"
             aria-label="Open filters"
@@ -322,6 +325,7 @@ export function Navbar() {
               <span className="h-1.5 w-1.5 rounded-full bg-[#212529]" />
             ) : null}
           </button>
+          ) : null}
 
           <div
             ref={searchWrapRef}

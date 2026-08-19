@@ -36,7 +36,15 @@ type ApiFetchOptions = RequestInit & {
 
 let handlingUnauthorized = false;
 
-function redirectToLogin() {
+export function isInactiveAccountError(
+  status: number,
+  message?: string | null,
+): boolean {
+  if (status !== 403) return false;
+  return (message ?? "").toLowerCase().includes("inactive");
+}
+
+function redirectToLogin(reason?: "inactive") {
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith("/login")) return;
   if (handlingUnauthorized) return;
@@ -57,9 +65,10 @@ function redirectToLogin() {
       /* ignore */
     });
   const next = `${window.location.pathname}${window.location.search}`;
-  window.location.assign(
-    `/login?next=${encodeURIComponent(next || "/")}`,
-  );
+  const query = new URLSearchParams();
+  query.set("next", next || "/");
+  if (reason === "inactive") query.set("reason", "inactive");
+  window.location.assign(`/login?${query.toString()}`);
 }
 
 export async function apiFetch(
@@ -107,6 +116,18 @@ export async function apiFetch(
 
     if (res.status === 401 && auth && !skipAuthRedirect) {
       redirectToLogin();
+    } else if (res.status === 403 && auth && !skipAuthRedirect) {
+      void res
+        .clone()
+        .json()
+        .then((body: { error?: string }) => {
+          if (isInactiveAccountError(403, body?.error)) {
+            redirectToLogin("inactive");
+          }
+        })
+        .catch(() => {
+          /* ignore */
+        });
     } else if (res.status >= 400 && auth) {
       // Silent ops beacon — never blocks the caller.
       const beaconPath = path.startsWith("http")
@@ -1180,16 +1201,23 @@ export async function fetchGeoOptions(params: {
   country?: string;
   signal?: AbortSignal;
 } = {}): Promise<GeoOptionsResponse> {
+  const expectedType = params.type ?? "countries";
   const sp = new URLSearchParams();
-  if (params.type) sp.set("type", params.type);
+  sp.set("type", expectedType);
   if (params.country) sp.set("country", params.country);
   const qs = sp.toString();
-  return getJSONCached<GeoOptionsResponse>(
-    `/api/leads/geo-options${qs ? `?${qs}` : ""}`,
+  const data = await getJSONCached<GeoOptionsResponse>(
+    `/api/leads/geo-options?${qs}`,
     60_000,
     params.signal,
     "Failed to load geo options",
   );
+  if (data.type && data.type !== expectedType) {
+    throw new Error(
+      `Geo options type mismatch: expected ${expectedType}, got ${data.type}`,
+    );
+  }
+  return data;
 }
 
 export type TimeBucketCount = {
