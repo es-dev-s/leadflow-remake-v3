@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDate } from "@/lib/datetime";
+import { isAnalystTeamLead, isSuperadmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 
 function initials(name: string) {
@@ -24,11 +25,13 @@ export default function ProfilePage() {
 
   const managerName = user.managerName?.trim();
   const hasManager = Boolean(user.managerId?.trim() || managerName);
+  const showTeam =
+    !isSuperadmin(user.role) && !isAnalystTeamLead(user.role);
 
   const rows: Array<{ label: string; value: string }> = [
     { label: "Email", value: user.email || "—" },
     { label: "Role", value: user.roleLabel || user.role || "—" },
-    { label: "Team", value: user.teamName || "—" },
+    ...(showTeam ? [{ label: "Team", value: user.teamName || "—" }] : []),
     ...(hasManager
       ? [{ label: "Manager", value: managerName || "—" }]
       : []),
