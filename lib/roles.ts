@@ -182,6 +182,13 @@ export function canMutateLeads(role: string | null | undefined) {
   );
 }
 
+/** Superadmin and ATL may require a password reset on next login. */
+export function canSetPasswordResetRequirement(
+  role: string | null | undefined,
+) {
+  return isSuperadmin(role) || isAnalystTeamLead(role);
+}
+
 /** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
 export function canCreateLeads(role: string | null | undefined) {
   if (

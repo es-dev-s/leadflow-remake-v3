@@ -9,7 +9,7 @@ import {
   type RoleOption,
 } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
-import { creatableRoleOptions, roleDisplayLabel } from "@/lib/roles";
+import { creatableRoleOptions, canSetPasswordResetRequirement, roleDisplayLabel } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { useAuthStore } from "@/store/auth-store";
 import { Eye, EyeOff, RefreshCw, X } from "lucide-react";
@@ -30,6 +30,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
   const actor = useAuthStore((s) => s.user);
   const actorRole = actor?.role;
   const actorRoleLabel = roleDisplayLabel(actor?.role, actor?.roleLabel);
+  const allowPasswordResetFlag = canSetPasswordResetRequirement(actorRole);
   const [mounted, setMounted] = useState(false);
   const [roles, setRoles] = useState<RoleOption[]>(() =>
     creatableRoleOptions(actorRole),
@@ -108,13 +109,16 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
     setError(null);
     setFieldErrors({});
     try {
-      const result = await updateUserRequest(targetId, {
+      const payload: Parameters<typeof updateUserRequest>[1] = {
         name: name.trim(),
         email: email.trim(),
         role,
         password: password.trim() ? password : null,
-        mustResetPassword: mustReset,
-      });
+      };
+      if (allowPasswordResetFlag) {
+        payload.mustResetPassword = mustReset;
+      }
+      const result = await updateUserRequest(targetId, payload);
       if (!openRef.current || userIdRef.current !== targetId) return;
       onUpdated(result.user, result.temporaryPassword);
       await succeedSubmit("Saved");
@@ -259,6 +263,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
             ) : null}
           </div>
 
+          {allowPasswordResetFlag ? (
           <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#fbfbfc] px-3 py-2.5">
             <input
               type="checkbox"
@@ -276,6 +281,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
               </span>
             </span>
           </label>
+          ) : null}
 
           <div>
             <p
