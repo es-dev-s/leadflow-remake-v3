@@ -33,6 +33,8 @@ function LoginForm() {
     return raw;
   }, [searchParams]);
 
+  const deactivatedNotice = searchParams.get("reason") === "inactive";
+
   useEffect(() => {
     // Always probe the HttpOnly cookie — no JWT in JS storage.
     const controller = new AbortController();
@@ -162,6 +164,13 @@ function LoginForm() {
               ) : null}
             </div>
           </div>
+
+          {deactivatedNotice ? (
+            <p className="mt-4 rounded-lg border border-[rgba(232,104,18,0.22)] bg-[#fff7ef] px-3 py-2 text-[12px] text-[#9a3f00]">
+              Your account was deactivated. Contact an administrator if you
+              need access restored.
+            </p>
+          ) : null}
 
           {error ? (
             <p className="mt-4 rounded-lg border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-3 py-2 text-[12px] text-[#c92a2a]">
