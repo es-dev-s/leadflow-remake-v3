@@ -128,48 +128,8 @@ export async function apiFetch(
         .catch(() => {
           /* ignore */
         });
-    } else if (res.status >= 400 && auth) {
-      // Silent ops beacon — never blocks the caller.
-      const beaconPath = path.startsWith("http")
-        ? new URL(path).pathname
-        : path.split("?")[0] || path;
-      void import("@/lib/telemetry-api")
-        .then((m) =>
-          m.emitHttpStatus(res.status, beaconPath, rest.method || "GET"),
-        )
-        .catch(() => {
-          /* ignore */
-        });
     }
     return res;
-  } catch (err) {
-    const aborted =
-      (typeof DOMException !== "undefined" &&
-        err instanceof DOMException &&
-        err.name === "AbortError") ||
-      (err instanceof Error && err.name === "AbortError");
-    if (auth && !aborted) {
-      const beaconPath = path.startsWith("http")
-        ? (() => {
-            try {
-              return new URL(path).pathname;
-            } catch {
-              return path;
-            }
-          })()
-        : path.split("?")[0] || path;
-      void import("@/lib/telemetry-api")
-        .then((m) =>
-          m.emitConnectionBreak(
-            err instanceof Error ? err.message : "network failure",
-            beaconPath,
-          ),
-        )
-        .catch(() => {
-          /* ignore */
-        });
-    }
-    throw err;
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", onOuterAbort);

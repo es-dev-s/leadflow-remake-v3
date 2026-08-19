@@ -21,7 +21,6 @@ import { usePersistedOverviewScroll } from "@/hooks/use-persisted-overview-scrol
 import { fetchLeadsSummary, type LeadSummary } from "@/lib/api";
 import { formatFacetChips } from "@/lib/lead-filter-labels";
 import type { LeadsDeepLink } from "@/lib/leads-href";
-import { SupportDashboard } from "@/components/dashboard/support-dashboard";
 import {
   canViewLeadData,
   canViewUsers,
@@ -35,6 +34,7 @@ import {
   useDashboardFilterStore,
 } from "@/store/dashboard-filter-store";
 import { useAuthStore } from "@/store/auth-store";
+import { countOnline, usePresenceStore } from "@/store/presence-store";
 
 function formatCount(value: number | undefined) {
   if (value == null) return "—";
@@ -55,6 +55,7 @@ export function OverviewContent() {
   const navigateToLeads = useNavigateToLeads();
   const scrollRef = usePersistedOverviewScroll();
   const role = useAuthStore((s) => s.user?.role);
+  const userTeamId = useAuthStore((s) => s.user?.teamId);
   const analyticsScoped = isAnalyticsScoped(role);
   const assigneeScoped = isAssigneeScoped(role);
   const teamScoped = isTeamScoped(role);
@@ -128,8 +129,20 @@ export function OverviewContent() {
     [filters],
   );
 
+  const presenceTeamId =
+    filters.teamId || (teamScoped ? userTeamId : "") || undefined;
+  const liveActiveUsers = usePresenceStore((s) =>
+    s.hydrated ? countOnline(s.byId, presenceTeamId) : null,
+  );
+
   if (!canViewLeadData(role)) {
-    return <SupportDashboard />;
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center px-6">
+        <p className="text-sm text-[#6c757d]">
+          This account does not have access to CRM data.
+        </p>
+      </div>
+    );
   }
 
   const open = (link: LeadsDeepLink) => {
@@ -178,7 +191,7 @@ export function OverviewContent() {
       : [
           {
             label: "Active users",
-            value: formatCount(summary?.activeUsers),
+            value: formatCount(liveActiveUsers ?? summary?.activeUsers),
             href: canViewUsers(role) ? "/users" : undefined,
           },
         ]),

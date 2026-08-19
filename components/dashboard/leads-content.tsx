@@ -414,7 +414,6 @@ const LeadRow = memo(function LeadRow({
   const toggleLeadSelection = useLeadsStore((s) => s.toggleLeadSelection);
   const setLeadSelected = useLeadsStore((s) => s.setLeadSelected);
   const clearLeadSelection = useLeadsStore((s) => s.clearLeadSelection);
-  const markLeadSeen = useLeadsStore((s) => s.markLeadSeen);
   const openLeadPreview = useUiStore((s) => s.openLeadPreview);
   const closeLeadPreview = useUiStore((s) => s.closeLeadPreview);
 
@@ -429,7 +428,6 @@ const LeadRow = memo(function LeadRow({
           closeLeadPreview();
           return;
         }
-        markLeadSeen(lead.id);
         openLeadPreview(lead.id);
         startTransition(() => {
           clearLeadSelection();

@@ -6,7 +6,6 @@ export const Role = {
   LeadAnalyst: "LEAD_ANALYST",
   MainTeamLead: "MAIN_TEAM_LEAD",
   SalesExecutive: "SALES_EXECUTIVE",
-  Support: "SUPPORT",
 } as const;
 
 export type RoleId = (typeof Role)[keyof typeof Role];
@@ -22,7 +21,6 @@ export const ALL_ROLE_OPTIONS: RoleOption[] = [
   { value: Role.LeadAnalyst, label: "Lead Analyst" },
   { value: Role.MainTeamLead, label: "Main Team Lead" },
   { value: Role.SalesExecutive, label: "Sales Executive" },
-  { value: Role.Support, label: "Support" },
 ];
 
 const ATL_MANAGED: RoleId[] = [
@@ -68,13 +66,9 @@ export function roleDisplayLabel(
     .join(" ");
 }
 
-export function isSupport(role: string | null | undefined) {
-  return role === Role.Support;
-}
-
 /** Who may see lead inventory, pipeline, transfers, and lead analytics. */
 export function canViewLeadData(role: string | null | undefined) {
-  return !isSupport(role) && Boolean(role);
+  return ALL_ROLE_OPTIONS.some((option) => option.value === role);
 }
 
 /** Operational KPI page — not for Sales Executives (assigned-inventory focus). */
@@ -191,12 +185,7 @@ export function canSetPasswordResetRequirement(
 
 /** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
 export function canCreateLeads(role: string | null | undefined) {
-  if (
-    !role ||
-    isMainTeamLead(role) ||
-    isSalesExecutive(role) ||
-    isSupport(role)
-  ) {
+  if (!role || isMainTeamLead(role) || isSalesExecutive(role)) {
     return false;
   }
   return (

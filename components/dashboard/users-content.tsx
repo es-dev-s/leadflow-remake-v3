@@ -34,6 +34,7 @@ import { useActionPhase } from "@/hooks/use-action-phase";
 import { subscribeRealtime } from "@/lib/realtime";
 import { formatDate } from "@/lib/datetime";
 import { canManageUsers, useAuthStore } from "@/store/auth-store";
+import { usePresenceStore } from "@/store/presence-store";
 
 function formatCount(value: number) {
   return value.toLocaleString("en-US");
@@ -64,6 +65,8 @@ function roleTone(role: string) {
 
 export function UsersContent() {
   const currentUser = useAuthStore((s) => s.user);
+  const presenceById = usePresenceStore((s) => s.byId);
+  const presenceHydrated = usePresenceStore((s) => s.hydrated);
   const canManage = canManageUsers(currentUser);
   const tabs = useMemo(
     () => userManagementTabs(currentUser?.role),
@@ -259,8 +262,11 @@ export function UsersContent() {
     canActOnUserRole(currentUser?.role, user.role);
 
   const activeCount = useMemo(
-    () => users.filter((user) => user.isActiveSession).length,
-    [users],
+    () =>
+      users.filter((user) =>
+        presenceHydrated ? Boolean(presenceById[user.id]) : user.isActiveSession,
+      ).length,
+    [users, presenceById, presenceHydrated],
   );
 
   function rememberPassword(userId: string, password: string) {
@@ -497,6 +503,9 @@ export function UsersContent() {
                 const issued = issuedPasswords[user.id];
                 const revealed = Boolean(revealedPasswordIds[user.id]);
                 const isSelf = currentUser?.id === user.id;
+                const online = presenceHydrated
+                  ? Boolean(presenceById[user.id])
+                  : user.isActiveSession;
                 const accountActive = user.isActive !== false;
                 const canAct =
                   canManage &&
@@ -566,17 +575,17 @@ export function UsersContent() {
                       <span className="inline-flex items-center gap-1.5 text-[12px]">
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            user.isActiveSession ? "bg-[#2f9e44]" : "bg-[#ced4da]"
+                            online ? "bg-[#2f9e44]" : "bg-[#ced4da]"
                           }`}
                         />
                         <span
                           className={
-                            user.isActiveSession
+                            online
                               ? "font-medium text-[#2b8a3e]"
                               : "text-[#868e96]"
                           }
                         >
-                          {user.isActiveSession ? "Online" : "Offline"}
+                          {online ? "Online" : "Offline"}
                         </span>
                       </span>
                     </td>

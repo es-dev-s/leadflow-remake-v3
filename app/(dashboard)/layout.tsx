@@ -1,6 +1,6 @@
 import { AuthGate } from "@/components/auth/auth-gate";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { TelemetryHeartbeat } from "@/components/telemetry/telemetry-heartbeat";
+import { PresenceBridge } from "@/components/dashboard/presence-bridge";
 
 export default function DashboardLayout({
   children,
@@ -9,7 +9,7 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthGate>
-      <TelemetryHeartbeat />
+      <PresenceBridge />
       <DashboardShell>{children}</DashboardShell>
     </AuthGate>
   );

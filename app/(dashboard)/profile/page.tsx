@@ -3,6 +3,7 @@
 import { formatDate } from "@/lib/datetime";
 import { isAnalystTeamLead, isSuperadmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
+import { usePresenceStore } from "@/store/presence-store";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -14,6 +15,9 @@ function initials(name: string) {
 export default function ProfilePage() {
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const sessionOnline = usePresenceStore((s) =>
+    user?.id ? Boolean(s.byId[user.id]) : false,
+  );
 
   if (!user) {
     return (
@@ -37,7 +41,7 @@ export default function ProfilePage() {
       : []),
     {
       label: "Session",
-      value: user.isActiveSession ? "Online" : "Offline",
+      value: sessionOnline || user.isActiveSession ? "Online" : "Offline",
     },
     {
       label: "Password",

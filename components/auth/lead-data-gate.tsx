@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { canViewLeadData } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 
-/** Redirects Support (and any role without lead access) to the empty dashboard. */
+/** Redirects roles without lead access to the dashboard. */
 export function LeadDataGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const role = useAuthStore((s) => s.user?.role);

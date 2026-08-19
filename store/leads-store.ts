@@ -120,7 +120,6 @@ type LeadsState = {
   patchLead: (id: string, patch: Partial<LeadRecord>) => void;
   /** Soft-remove rows after delete without blanking the table. */
   removeLeads: (ids: readonly string[]) => void;
-  markLeadSeen: (id: string) => void;
   /** Soft-update rows after assign without blanking the table. */
   applyAssignments: (
     assignments: ReadonlyArray<{
@@ -903,17 +902,6 @@ export const useLeadsStore = create<LeadsState>()(
         });
       },
 
-      markLeadSeen: (id) =>
-        set((state) => {
-          const index = state.items.findIndex((item) => item.id === id);
-          if (index < 0) return state;
-          const current = state.items[index];
-          if (!current.isNew && current.tag !== "New") return state;
-          const items = state.items.slice();
-          items[index] = { ...current, isNew: false, tag: "—" };
-          return { items };
-        }),
-
       applyAssignments: (assignments) => {
         if (assignments.length === 0) return;
         set((state) => {
@@ -928,6 +916,11 @@ export const useLeadsStore = create<LeadsState>()(
               team: next.team,
               salesExecutive: next.salesExecutive,
               handoff: next.handoff,
+              isNew: false,
+              tag:
+                item.notAppropriate || item.tag === "Not appropriate"
+                  ? "Not appropriate"
+                  : "—",
             };
           });
           const flash: Record<string, true> = { ...state.flashAssignedById };

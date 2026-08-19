@@ -6,6 +6,9 @@ export type RealtimeEvent = {
   type: string;
   leadId?: string;
   userId?: string;
+  teamId?: string;
+  role?: string;
+  users?: Array<{ userId: string; teamId?: string; role?: string }>;
   actorId?: string;
   at?: number;
 };
@@ -95,7 +98,9 @@ class RealtimeClient {
         return;
       }
       if (!parsed || !parsed.type) return;
-      clearQueryCache();
+      if (!parsed.type.startsWith("presence.")) {
+        clearQueryCache();
+      }
       for (const listener of this.listeners) {
         try {
           listener(parsed);
@@ -106,13 +111,6 @@ class RealtimeClient {
     };
 
     es.onerror = () => {
-      void import("@/lib/telemetry-api")
-        .then((m) =>
-          m.emitConnectionBreak("realtime EventSource error", "/api/events"),
-        )
-        .catch(() => {
-          /* ignore */
-        });
       es.close();
       if (this.source === es) this.source = null;
       this.scheduleReconnect();
