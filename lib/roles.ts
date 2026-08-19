@@ -182,8 +182,16 @@ export function canMutateLeads(role: string | null | undefined) {
   );
 }
 
-/** Superadmin, ATL, and Lead Analyst may add leads. */
+/** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
 export function canCreateLeads(role: string | null | undefined) {
+  if (
+    !role ||
+    isMainTeamLead(role) ||
+    isSalesExecutive(role) ||
+    isSupport(role)
+  ) {
+    return false;
+  }
   return (
     isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
   );
