@@ -4,6 +4,7 @@ import { ApiError, fetchMe, loginRequest } from "@/lib/api";
 import { COOKIE_SESSION, clearAuthToken, getAuthToken } from "@/lib/auth-token";
 import { isAbortError } from "@/lib/reset-client-state";
 import { useAuthStore } from "@/store/auth-store";
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   FormEvent,
@@ -22,6 +23,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -147,16 +149,31 @@ function LoginForm() {
               >
                 Password
               </label>
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 w-full rounded-xl border border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] px-3.5 text-[13px] text-[#212529] outline-none transition-[border-color,box-shadow] placeholder:text-[#adb5bd] focus:border-[rgba(232,104,18,0.5)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] px-3.5 pr-10 text-[13px] text-[#212529] outline-none transition-[border-color,box-shadow] placeholder:text-[#adb5bd] focus:border-[rgba(232,104,18,0.5)] focus:bg-white focus:shadow-[0_0_0_3px_rgba(232,104,18,0.1)]"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  disabled={submitting || !password}
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute top-1/2 right-2.5 -translate-y-1/2 rounded-md p-1 text-[#adb5bd] hover:text-[#495057] disabled:opacity-40"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff size={14} strokeWidth={1.75} />
+                  ) : (
+                    <Eye size={14} strokeWidth={1.75} />
+                  )}
+                </button>
+              </div>
               {fieldErrors.password ? (
                 <p className="mt-1 text-[11px] text-[#c92a2a]">
                   {fieldErrors.password}

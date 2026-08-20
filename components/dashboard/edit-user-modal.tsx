@@ -4,18 +4,14 @@ import { ActionButton } from "@/components/dashboard/action-button";
 import {
   ApiError,
   fetchRoles,
-  fetchTeams,
   updateUserRequest,
   type PublicUser,
   type RoleOption,
-  type TeamBrief,
 } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
-  actorAssignsSalesTeam,
   creatableRoleOptions,
   isLeadAnalyst,
-  isMainTeamLead,
   roleDisplayLabel,
   roleNeedsSalesTeam,
   Role,
@@ -48,8 +44,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("LEAD_ANALYST");
   const [teamName, setTeamName] = useState("");
-  const [teamId, setTeamId] = useState("");
-  const [teams, setTeams] = useState<TeamBrief[]>([]);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const {
@@ -75,7 +69,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
     setEmail(user.email);
     setRole(user.role);
     setTeamName(user.analystTeamName?.trim() || user.teamName?.trim() || "");
-    setTeamId(user.teamId?.trim() || "");
     setPassword("");
     setShowPassword(false);
     setError(null);
@@ -108,14 +101,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
       .catch(() => {
         /* keep scoped defaults */
       });
-    void fetchTeams(controller.signal)
-      .then((rows) => {
-        if (controller.signal.aborted) return;
-        setTeams(rows);
-      })
-      .catch(() => {
-        /* picker stays empty; submit validation covers this */
-      });
     return () => controller.abort();
   }, [open, user, actorRole]);
 
@@ -123,8 +108,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
 
   const showAnalystTeam =
     role === Role.AnalystTeamLead || isLeadAnalyst(role);
-  const showSalesTeam =
-    actorAssignsSalesTeam(actorRole) && roleNeedsSalesTeam(role);
+  const showSalesTeam = roleNeedsSalesTeam(role);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -142,9 +126,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
       };
       if (showAnalystTeam) {
         payload.teamName = teamName.trim();
-      }
-      if (showSalesTeam) {
-        payload.teamId = teamId.trim();
       }
       const result = await updateUserRequest(targetId, payload);
       if (!openRef.current || userIdRef.current !== targetId) return;
@@ -199,6 +180,17 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
           onSubmit={onSubmit}
           className="lf-scroll max-h-[calc(min(92dvh,720px)-72px)] space-y-3.5 overflow-y-auto px-5 py-4"
         >
+          {showSalesTeam ? (
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+                Team
+              </p>
+              <p className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-2.5 text-[13px] text-[#212529]">
+                {user.teamName?.trim() || "No team"}
+              </p>
+            </div>
+          ) : null}
+
           <div>
             <label className="mb-1.5 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
               Full name
@@ -362,53 +354,6 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
                     : "Assign this Lead Analyst to an analyst team"}
                 </p>
               )}
-            </div>
-          ) : null}
-
-          {showSalesTeam ? (
-            <div>
-              <label className="mb-1.5 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
-                Team
-              </label>
-              <select
-                className={inputClass}
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
-                required
-                disabled={submitting}
-              >
-                <option value="">Select a team</option>
-                {user.teamId &&
-                !teams.some((team) => team.id === user.teamId) ? (
-                  <option value={user.teamId}>
-                    {user.teamName || "Current team"}
-                  </option>
-                ) : null}
-                {teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.teamId ? (
-                <p className="mt-1 text-[11px] text-[#c92a2a]">
-                  {fieldErrors.teamId}
-                </p>
-              ) : (
-                <p className="mt-1 text-[11px] text-[#adb5bd]">
-                  Assign or reassign this sales executive. Changing team also
-                  moves their assigned leads.
-                </p>
-              )}
-            </div>
-          ) : isMainTeamLead(actorRole) && roleNeedsSalesTeam(role) ? (
-            <div>
-              <label className="mb-1.5 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
-                Team
-              </label>
-              <p className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-2.5 text-[13px] text-[#495057]">
-                {user.teamName || "Your team"}
-              </p>
             </div>
           ) : null}
 
