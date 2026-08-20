@@ -23,6 +23,7 @@ import {
   setUserActiveRequest,
   type PublicUser,
 } from "@/lib/api";
+import { copyToClipboard } from "@/lib/clipboard";
 import {
   canActOnUserRole,
   isAnalystTeamLead,
@@ -276,7 +277,7 @@ export function UsersContent() {
 
   async function copyPassword(userId: string, password: string) {
     try {
-      await navigator.clipboard.writeText(password);
+      await copyToClipboard(password);
       setCopiedId(userId);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopiedId(null), 1600);
