@@ -89,6 +89,8 @@ export function TransferSeModal({ open, user, onClose, onTransferred }: Props) {
 
   if (!mounted || !open || !user) return null;
 
+  const hasTeam = Boolean(user.teamId?.trim());
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (submitting || !user || !toTeamId) return;
@@ -107,7 +109,7 @@ export function TransferSeModal({ open, user, onClose, onTransferred }: Props) {
         result.leadsMoved,
         dest?.name || result.user.teamName || "selected team",
       );
-      await succeedSubmit("Transferred");
+      await succeedSubmit(hasTeam ? "Transferred" : "Assigned");
       if (!openRef.current || userIdRef.current !== targetId) return;
       onClose();
     } catch (err: unknown) {
@@ -143,7 +145,7 @@ export function TransferSeModal({ open, user, onClose, onTransferred }: Props) {
               id="transfer-se-title"
               className="text-[16px] font-medium tracking-[-0.02em] text-[#212529]"
             >
-              Transfer to another team
+              Transfer to a team
             </h2>
             <p className="mt-0.5 truncate text-[12px] text-[#868e96]">
               {user.name} · {user.teamName || "No team"}
@@ -163,9 +165,9 @@ export function TransferSeModal({ open, user, onClose, onTransferred }: Props) {
           <div className="lf-scroll min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             <div className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-3">
               <p className="text-[12px] leading-relaxed text-[#495057]">
-                Moves this sales executive and all leads currently assigned to
-                them onto the destination team. The transfer is recorded in
-                Transfer logs.
+                {hasTeam
+                  ? "Moves this sales executive and all leads currently assigned to them onto the destination team. The transfer is recorded in Transfer logs."
+                  : "Assigns this sales executive to the selected team. Any leads currently assigned to them move with them. The change is recorded in Transfer logs."}
               </p>
               <p className="mt-2 text-[12px] font-medium tabular-nums text-[#212529]">
                 {leadCount == null
@@ -223,7 +225,7 @@ export function TransferSeModal({ open, user, onClose, onTransferred }: Props) {
               type="submit"
               phase={submitPhase}
               disabled={!toTeamId || loadingMeta}
-              idleLabel="Transfer"
+              idleLabel={hasTeam ? "Transfer" : "Assign"}
               pendingLabel="Transferring…"
               successLabel="Transferred"
               className="h-10 rounded-xl px-4 text-[13px]"

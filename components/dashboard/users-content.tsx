@@ -259,7 +259,6 @@ export function UsersContent() {
   const canTransferSe = (user: PublicUser) =>
     canManage &&
     user.role === Role.SalesExecutive &&
-    Boolean(user.teamId) &&
     canActOnUserRole(currentUser?.role, user.role);
 
   const activeCount = useMemo(
