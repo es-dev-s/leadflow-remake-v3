@@ -5,17 +5,13 @@ import {
   Pencil,
   Plus,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { useEffect, useMemo, useState } from "react";
 import { CreateUserModal } from "@/components/dashboard/create-user-modal";
 import { EditUserModal } from "@/components/dashboard/edit-user-modal";
 import { TransferSeModal } from "@/components/dashboard/transfer-se-modal";
 import {
-  ApiError,
-  deleteUserRequest,
   fetchUsers,
   setUserActiveRequest,
   type PublicUser,
@@ -27,7 +23,6 @@ import {
   Role,
   userManagementTabs,
 } from "@/lib/roles";
-import { useActionPhase } from "@/hooks/use-action-phase";
 import { subscribeRealtime } from "@/lib/realtime";
 import { formatDate } from "@/lib/datetime";
 import { canManageUsers, useAuthStore } from "@/store/auth-store";
@@ -78,19 +73,9 @@ export function UsersContent() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<PublicUser | null>(null);
   const [transferring, setTransferring] = useState<PublicUser | null>(null);
-  const [deleting, setDeleting] = useState<PublicUser | null>(null);
-  const {
-    phase: deletePhase,
-    start: startDelete,
-    succeed: succeedDelete,
-    fail: failDelete,
-    reset: resetDelete,
-    isBusy: deleteLoading,
-  } = useActionPhase();
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
-  const deleteEpochRef = useRef(0);
 
   async function toggleUserActive(user: PublicUser) {
     if (togglingActiveId || currentUser?.id === user.id) return;
@@ -254,34 +239,6 @@ export function UsersContent() {
       ).length,
     [users, presenceById, presenceHydrated],
   );
-
-  async function confirmDelete() {
-    if (!deleting || deleteLoading) return;
-    const target = deleting;
-    const epoch = ++deleteEpochRef.current;
-    startDelete();
-    setActionError(null);
-    try {
-      await deleteUserRequest(target.id);
-      if (epoch !== deleteEpochRef.current) return;
-      setUsers((prev) => prev.filter((row) => row.id !== target.id));
-      setTotal((prev) => Math.max(0, prev - 1));
-      await succeedDelete("Deleted");
-      if (epoch !== deleteEpochRef.current) return;
-      setDeleting(null);
-    } catch (err: unknown) {
-      if (epoch !== deleteEpochRef.current) return;
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to delete user";
-      setActionError(message);
-      failDelete();
-      setDeleting(null);
-    }
-  }
 
   return (
     <section className="@container flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-[rgba(33,37,41,0.06)] bg-white">
@@ -633,23 +590,6 @@ export function UsersContent() {
                                 Transfer
                               </button>
                             ) : null}
-                            <button
-                              type="button"
-                              disabled={isSelf}
-                              title={
-                                isSelf
-                                  ? "You cannot delete your own account"
-                                  : "Delete user"
-                              }
-                              onClick={() => {
-                                setActionError(null);
-                                setDeleting(user);
-                              }}
-                              className="lf-pressable inline-flex h-8 items-center gap-1 rounded-lg border border-[rgba(201,42,42,0.16)] bg-white px-2.5 text-[11px] font-medium text-[#c92a2a] hover:bg-[#fff5f5] disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              <Trash2 size={12} strokeWidth={1.75} />
-                              Delete
-                            </button>
                           </div>
                         ) : (
                           <span className="block text-right text-[11px] text-[#adb5bd]">
@@ -718,33 +658,6 @@ export function UsersContent() {
                 ? ` · ${leadsMoved.toLocaleString("en-US")} lead${leadsMoved === 1 ? "" : "s"} updated`
                 : ""),
           );
-        }}
-      />
-
-      <ConfirmDialog
-        open={Boolean(deleting)}
-        title="Delete user?"
-        description={
-          deleting ? (
-            <>
-              <span className="font-bold text-[#c2410c]">{deleting.name}</span>
-              {` (${deleting.email}) will be removed. Their leads stay in the CRM and are reassigned to you. This cannot be undone.`}
-            </>
-          ) : null
-        }
-        confirmLabel="Delete user"
-        pendingLabel="Deleting…"
-        successLabel="Deleted"
-        tone="danger"
-        phase={deletePhase}
-        onCancel={() => {
-          if (!deleteLoading) {
-            setDeleting(null);
-            resetDelete();
-          }
-        }}
-        onConfirm={() => {
-          void confirmDelete();
         }}
       />
     </section>
