@@ -5,16 +5,21 @@ import {
   ApiError,
   createUserRequest,
   fetchRoles,
+  fetchTeams,
   type PublicUser,
   type RoleOption,
+  type TeamBrief,
 } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
+  actorAssignsSalesTeam,
   creatableRoleOptions,
   defaultCreateRole,
   isAnalystTeamLead,
+  isMainTeamLead,
   roleDisplayLabel,
   roleNeedsNamedTeam,
+  roleNeedsSalesTeam,
   Role,
 } from "@/lib/roles";
 import { useActionPhase } from "@/hooks/use-action-phase";
@@ -52,6 +57,8 @@ export function CreateUserModal({
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState(defaultCreateRole(actorRole));
   const [teamName, setTeamName] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [teams, setTeams] = useState<TeamBrief[]>([]);
   const {
     phase: submitPhase,
     start: startSubmit,
@@ -71,6 +78,8 @@ export function CreateUserModal({
     role === Role.LeadAnalyst &&
     Boolean(actorAnalystTeam);
   const needsTeam = roleNeedsNamedTeam(role);
+  const needsSalesTeam =
+    actorAssignsSalesTeam(actorRole) && roleNeedsSalesTeam(role);
 
   useEffect(() => setMounted(true), []);
 
@@ -87,6 +96,7 @@ export function CreateUserModal({
     setShowPassword(false);
     setRole(initialRole);
     setTeamName("");
+    setTeamId("");
     setError(null);
     setFieldErrors({});
     resetSubmit();
@@ -105,6 +115,14 @@ export function CreateUserModal({
       .catch(() => {
         /* keep scoped defaults */
       });
+    void fetchTeams(controller.signal)
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        setTeams(rows);
+      })
+      .catch(() => {
+        /* picker stays empty; submit validation covers this */
+      });
     return () => controller.abort();
   }, [open, actorRole, preferredRole]);
 
@@ -122,6 +140,7 @@ export function CreateUserModal({
         email: email.trim(),
         password,
         role,
+        teamId: needsSalesTeam ? teamId.trim() : undefined,
         teamName: inheritAnalystTeam
           ? actorAnalystTeam
           : needsTeam
@@ -300,6 +319,14 @@ export function CreateUserModal({
                           return next;
                         });
                       }
+                      if (!roleNeedsSalesTeam(option.value)) {
+                        setTeamId("");
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.teamId;
+                          return next;
+                        });
+                      }
                     }}
                     className={[
                       "lf-pressable min-h-[42px] rounded-xl border px-3 py-2.5 text-left text-[12.5px] leading-snug font-medium transition-[border-color,background-color,color,box-shadow]",
@@ -378,6 +405,46 @@ export function CreateUserModal({
               </div>
             </div>
           </div>
+
+          {needsSalesTeam ? (
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+                Team
+              </label>
+              <select
+                className={inputClass}
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                required
+                disabled={submitting}
+              >
+                <option value="">Select a team</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.teamId ? (
+                <p className="mt-1 text-[11px] text-[#c92a2a]">
+                  {fieldErrors.teamId}
+                </p>
+              ) : teams.length === 0 ? (
+                <p className="mt-1 text-[11px] text-[#c92a2a]">
+                  No sales teams yet. Create a Main Team Lead first.
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-[#adb5bd]">
+                  Sales executives must be assigned to a sales team
+                </p>
+              )}
+            </div>
+          ) : isMainTeamLead(actorRole) && roleNeedsSalesTeam(role) ? (
+            <p className="text-[11px] text-[#adb5bd]">
+              This sales executive will be assigned to your team
+              {actor?.teamName ? ` (${actor.teamName})` : ""}.
+            </p>
+          ) : null}
 
           {error ? (
             <p className="rounded-lg border border-[rgba(201,42,42,0.18)] bg-[#fff5f5] px-3 py-2 text-[12px] text-[#c92a2a]">

@@ -1370,6 +1370,7 @@ export async function updateUserRequest(
     role: string;
     password?: string | null;
     teamName?: string | null;
+    teamId?: string | null;
     mustResetPassword?: boolean;
   },
   signal?: AbortSignal,
@@ -1384,6 +1385,9 @@ export async function updateUserRequest(
   }
   if (typeof payload.teamName === "string") {
     body.teamName = payload.teamName.trim();
+  }
+  if (typeof payload.teamId === "string" && payload.teamId.trim()) {
+    body.teamId = payload.teamId.trim();
   }
   if (typeof payload.mustResetPassword === "boolean") {
     body.mustResetPassword = payload.mustResetPassword;

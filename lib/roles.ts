@@ -180,6 +180,16 @@ export function roleNeedsNamedTeam(role: string | null | undefined) {
   return isMainTeamLead(role) || isAnalystTeamLead(role);
 }
 
+/** Sales Executives join an existing sales team (not a newly typed team name). */
+export function roleNeedsSalesTeam(role: string | null | undefined) {
+  return isSalesExecutive(role);
+}
+
+/** Superadmin and ATL pick the destination team; MTL always uses their own. */
+export function actorAssignsSalesTeam(actorRole: string | null | undefined) {
+  return isSuperadmin(actorRole) || isAnalystTeamLead(actorRole);
+}
+
 /** Superadmin, ATL, and Lead Analyst may add leads — not Main Team Lead or SE. */
 export function canCreateLeads(role: string | null | undefined) {
   if (!role || isMainTeamLead(role) || isSalesExecutive(role)) {
