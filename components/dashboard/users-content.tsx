@@ -2,9 +2,6 @@
 
 import {
   ArrowRightLeft,
-  Copy,
-  Eye,
-  EyeOff,
   Pencil,
   Plus,
   Search,
@@ -23,7 +20,6 @@ import {
   setUserActiveRequest,
   type PublicUser,
 } from "@/lib/api";
-import { copyToClipboard } from "@/lib/clipboard";
 import {
   canActOnUserRole,
   isAnalystTeamLead,
@@ -93,17 +89,8 @@ export function UsersContent() {
   } = useActionPhase();
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
-  /** One-time issued passwords (create/reset) — never read from the database. */
-  const [issuedPasswords, setIssuedPasswords] = useState<
-    Record<string, string>
-  >({});
-  const [revealedPasswordIds, setRevealedPasswordIds] = useState<
-    Record<string, true>
-  >({});
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
   const deleteEpochRef = useRef(0);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function toggleUserActive(user: PublicUser) {
     if (togglingActiveId || currentUser?.id === user.id) return;
@@ -155,7 +142,6 @@ export function UsersContent() {
       });
     return () => {
       controller.abort();
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     };
   }, []);
 
@@ -269,22 +255,6 @@ export function UsersContent() {
     [users, presenceById, presenceHydrated],
   );
 
-  function rememberPassword(userId: string, password: string) {
-    setIssuedPasswords((prev) => ({ ...prev, [userId]: password }));
-    setRevealedPasswordIds((prev) => ({ ...prev, [userId]: true }));
-  }
-
-  async function copyPassword(userId: string, password: string) {
-    try {
-      await copyToClipboard(password);
-      setCopiedId(userId);
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = setTimeout(() => setCopiedId(null), 1600);
-    } catch {
-      setActionError("Could not copy password to clipboard");
-    }
-  }
-
   async function confirmDelete() {
     if (!deleting || deleteLoading) return;
     const target = deleting;
@@ -296,18 +266,6 @@ export function UsersContent() {
       if (epoch !== deleteEpochRef.current) return;
       setUsers((prev) => prev.filter((row) => row.id !== target.id));
       setTotal((prev) => Math.max(0, prev - 1));
-      setIssuedPasswords((prev) => {
-        if (!prev[target.id]) return prev;
-        const next = { ...prev };
-        delete next[target.id];
-        return next;
-      });
-      setRevealedPasswordIds((prev) => {
-        if (!prev[target.id]) return prev;
-        const next = { ...prev };
-        delete next[target.id];
-        return next;
-      });
       await succeedDelete("Deleted");
       if (epoch !== deleteEpochRef.current) return;
       setDeleting(null);
@@ -489,7 +447,6 @@ export function UsersContent() {
                 {canManage ? (
                   <th className="px-2 py-2.5 font-medium">Account</th>
                 ) : null}
-                <th className="px-2 py-2.5 font-medium">Password</th>
                 <th className="px-2 py-2.5 text-right font-medium">Joined</th>
                 {canManage ? (
                   <th className="px-3.5 py-2.5 text-right font-medium @[28rem]:px-5">
@@ -500,8 +457,6 @@ export function UsersContent() {
             </thead>
             <tbody>
               {filtered.map((user, index) => {
-                const issued = issuedPasswords[user.id];
-                const revealed = Boolean(revealedPasswordIds[user.id]);
                 const isSelf = currentUser?.id === user.id;
                 const online = presenceHydrated
                   ? Boolean(presenceById[user.id])
@@ -647,68 +602,6 @@ export function UsersContent() {
                         )}
                       </td>
                     ) : null}
-                    <td className="px-2 py-2.5">
-                      {issued ? (
-                        <div className="flex min-w-[160px] flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <code className="max-w-[140px] truncate rounded-md border border-[rgba(233,136,18,0.28)] bg-[#fff7ef] px-1.5 py-0.5 font-mono text-[11px] text-[#9a3f00]">
-                              {revealed ? issued : "••••••••••••"}
-                            </code>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setRevealedPasswordIds((prev) => {
-                                  const next = { ...prev };
-                                  if (next[user.id]) delete next[user.id];
-                                  else next[user.id] = true;
-                                  return next;
-                                })
-                              }
-                              className="lf-pressable rounded-md p-1 text-[#adb5bd] hover:bg-[#f8f9fa] hover:text-[#495057]"
-                              aria-label={
-                                revealed ? "Hide password" : "Show password"
-                              }
-                            >
-                              {revealed ? (
-                                <EyeOff size={13} strokeWidth={1.75} />
-                              ) : (
-                                <Eye size={13} strokeWidth={1.75} />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void copyPassword(user.id, issued)}
-                              className="lf-pressable rounded-md p-1 text-[#adb5bd] hover:bg-[#f8f9fa] hover:text-[#495057]"
-                              aria-label="Copy password"
-                            >
-                              <Copy size={13} strokeWidth={1.75} />
-                            </button>
-                          </div>
-                          <span className="text-[10px] text-[#868e96]">
-                            {copiedId === user.id
-                              ? "Copied"
-                              : "Issued once — copy now"}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {user.hasPassword ? (
-                            <span className="rounded-md border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-1.5 py-0.5 text-[10px] font-medium text-[#495057]">
-                              Set
-                            </span>
-                          ) : (
-                            <span className="rounded-md border border-[rgba(233,136,18,0.28)] bg-[#fff7ef] px-1.5 py-0.5 text-[10px] font-medium text-[#9a3f00]">
-                              Not set
-                            </span>
-                          )}
-                          {user.mustResetPassword ? (
-                            <span className="rounded-md border border-[rgba(233,136,18,0.28)] bg-[#fff7ef] px-1.5 py-0.5 text-[10px] font-medium text-[#9a3f00]">
-                              Reset required
-                            </span>
-                          ) : null}
-                        </div>
-                      )}
-                    </td>
                     <td className="px-2 py-2.5 text-right text-[12px] tabular-nums text-[#868e96]">
                       {formatDate(user.createdAt)}
                     </td>
@@ -777,7 +670,7 @@ export function UsersContent() {
         open={createOpen}
         preferredRole={preferredCreateRole}
         onClose={() => setCreateOpen(false)}
-        onCreated={(user, temporaryPassword) => {
+        onCreated={(user) => {
           setQuery("");
           setRoleFilter(
             tabs.some((tab) => tab.id === user.role) ? user.role : tabs[0]?.id ?? "all",
@@ -788,7 +681,6 @@ export function UsersContent() {
             return next;
           });
           setTotal((prev) => prev + 1);
-          rememberPassword(user.id, temporaryPassword);
         }}
       />
 
@@ -796,13 +688,10 @@ export function UsersContent() {
         open={Boolean(editing)}
         user={editing}
         onClose={() => setEditing(null)}
-        onUpdated={(user, temporaryPassword) => {
+        onUpdated={(user) => {
           setUsers((prev) =>
             prev.map((row) => (row.id === user.id ? user : row)),
           );
-          if (temporaryPassword) {
-            rememberPassword(user.id, temporaryPassword);
-          }
           if (currentUser?.id === user.id) {
             useAuthStore.getState().setUser(user);
           }
