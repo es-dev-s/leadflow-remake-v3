@@ -216,24 +216,12 @@ function ColumnCell({
           className="min-w-0 overflow-hidden px-3 py-3 align-middle"
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1">
-            <div className="min-w-0 shrink">
-              <QualificationBadgeSelect
-                leadId={lead.id}
-                statusRaw={lead.statusRaw}
-                statusLabel={lead.status}
-                editable={qualificationEditable}
-              />
-            </div>
-            {lead.notAppropriate || lead.tag === "Not appropriate" ? (
-              <span
-                title="Not appropriate"
-                className="inline-flex max-w-[7.5rem] shrink-0 items-center rounded border border-[rgba(201,42,42,0.2)] bg-[#fff5f5] px-1.5 py-px text-[10px] font-medium leading-4 text-[#c92a2a] whitespace-nowrap"
-              >
-                <span className="truncate">Not appropriate</span>
-              </span>
-            ) : null}
-          </div>
+          <QualificationBadgeSelect
+            leadId={lead.id}
+            statusRaw={lead.statusRaw}
+            statusLabel={lead.status}
+            editable={qualificationEditable}
+          />
         </td>
       );
     case "score":
