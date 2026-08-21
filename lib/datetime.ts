@@ -138,17 +138,19 @@ export function formatLeadAddedAt(
   createdAt: string | null | undefined,
   createdAtRaw?: string | null,
 ): string {
+  // Prefer the API calendar date (already in business TZ) so the Added
+  // column matches the From/To date filter.
+  if (createdAt?.trim() && createdAt !== "—") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(createdAt.trim())) {
+      return formatDate(createdAt);
+    }
+    if (/,\s*12:00\s*AM$/i.test(createdAt.trim())) {
+      return formatDate(createdAt.split(",")[0]?.trim() || createdAt);
+    }
+  }
   if (createdAtRaw?.trim()) {
-    // Lead createdAt is a calendar date product field — show date only.
     return formatDate(createdAtRaw);
   }
   if (!createdAt?.trim() || createdAt === "—") return "—";
-  // Strip bogus midnight from legacy "M/D/YYYY, 12:00 AM" list formatting.
-  if (/,\s*12:00\s*AM$/i.test(createdAt.trim())) {
-    return formatDate(createdAt.split(",")[0]?.trim() || createdAt);
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(createdAt.trim())) {
-    return formatDate(createdAt);
-  }
   return formatDateTimeShort(createdAt);
 }

@@ -130,8 +130,13 @@ export function stageLabel(value: string | null | undefined) {
 }
 
 export function normalizeDateRange(from: string, to: string) {
-  let addedFrom = from.trim();
-  let addedTo = to.trim();
+  const calendarDay = (value: string) => {
+    const raw = value.trim();
+    const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    return match ? match[1] : raw;
+  };
+  let addedFrom = calendarDay(from);
+  let addedTo = calendarDay(to);
   if (addedFrom && addedTo && addedFrom > addedTo) {
     [addedFrom, addedTo] = [addedTo, addedFrom];
   }
