@@ -202,7 +202,9 @@ export function canCreateLeads(role: string | null | undefined) {
 
 /** Who may reassign leads to teams / members. */
 export function canAssignLeads(role: string | null | undefined) {
-  return canMutateLeads(role) && !isSalesExecutive(role);
+  return (
+    canMutateLeads(role) && !isSalesExecutive(role) && !isLeadAnalyst(role)
+  );
 }
 
 /**
