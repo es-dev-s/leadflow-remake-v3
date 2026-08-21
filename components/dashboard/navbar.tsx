@@ -240,7 +240,8 @@ export function Navbar() {
 
   const onLeads = pathname === "/leads" || pathname.startsWith("/leads/");
   const onProfile = pathname === "/profile" || pathname.startsWith("/profile/");
-  const showFilters = showLeadTools && !onProfile;
+  const onUsers = pathname === "/users" || pathname.startsWith("/users/");
+  const showFilters = showLeadTools && !onProfile && !onUsers;
   const filtersActive = onLeads
     ? leadFilterValue !== "all" || Object.values(leadFacets).some(Boolean)
     : hasDashboardFilters(dashboardFilters);

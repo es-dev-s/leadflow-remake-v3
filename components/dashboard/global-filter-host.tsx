@@ -15,13 +15,14 @@ export function GlobalFilterHost() {
   const closeFilterSidebar = useUiStore((s) => s.closeFilterSidebar);
   const onLeads = pathname === "/leads" || pathname.startsWith("/leads/");
   const onProfile = pathname === "/profile" || pathname.startsWith("/profile/");
+  const onUsers = pathname === "/users" || pathname.startsWith("/users/");
 
   // Avoid carrying an open panel across routes with different filter models.
   useEffect(() => {
     closeFilterSidebar();
   }, [pathname, closeFilterSidebar]);
 
-  if (!canViewLeadData(role) || onProfile) {
+  if (!canViewLeadData(role) || onProfile || onUsers) {
     return null;
   }
 
