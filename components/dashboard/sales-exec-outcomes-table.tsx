@@ -50,7 +50,6 @@ export function SalesExecOutcomesTable() {
     return list.reduce(
       (acc, row) => {
         acc.assigned += n(row.assigned);
-        acc.withTeamLead += n(row.withTeamLead);
         acc.withRep += n(row.withRep);
         acc.inProgress += n(row.inProgress);
         acc.won += n(row.won);
@@ -60,7 +59,6 @@ export function SalesExecOutcomesTable() {
       },
       {
         assigned: 0,
-        withTeamLead: 0,
         withRep: 0,
         inProgress: 0,
         won: 0,
@@ -84,8 +82,8 @@ export function SalesExecOutcomesTable() {
               Leads by Sales Executive
             </h2>
             <p className="mt-0.5 text-[11px] leading-snug text-[#868e96] @[28rem]:text-[12px]">
-              Assigned leads only. Leads = With TL + With rep + In progress +
-              Won + Lost + Other
+              Assigned leads only. Leads = Active leads + In progress + Won +
+              Lost + Other
             </p>
           </div>
 
@@ -104,8 +102,7 @@ export function SalesExecOutcomesTable() {
         {!page.loading ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] tabular-nums text-[#868e96] @[28rem]:text-[12px]">
             <span>{formatCount(page.bucketCount)} executives</span>
-            <span>{formatCount(totals.withTeamLead)} with TL</span>
-            <span>{formatCount(totals.withRep)} with rep</span>
+            <span>{formatCount(totals.withRep)} active leads</span>
             <span>{formatCount(totals.inProgress)} in progress</span>
             <span className="text-[#2f9e44]">{formatCount(totals.won)} won</span>
             <span>{formatCount(totals.lost)} lost</span>
@@ -139,15 +136,9 @@ export function SalesExecOutcomesTable() {
                 <th className="px-2 py-2 text-right font-medium">Leads</th>
                 <th
                   className="px-2 py-2 text-right font-medium"
-                  title="Sales stage: With team lead"
-                >
-                  With TL
-                </th>
-                <th
-                  className="px-2 py-2 text-right font-medium"
                   title="Sales stage: With executive"
                 >
-                  With rep
+                  Active leads
                 </th>
                 <th
                   className="px-2 py-2 text-right font-medium"
@@ -209,17 +200,6 @@ export function SalesExecOutcomesTable() {
                         className="lf-pressable text-[13px] font-medium tabular-nums text-[#212529] hover:underline"
                       >
                         {formatCount(n(row.assigned))}
-                      </button>
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openExec(row, { stage: "WITH_TEAM_LEAD" })
-                        }
-                        className="lf-pressable text-[13px] tabular-nums text-[#495057] hover:underline"
-                      >
-                        {formatCount(n(row.withTeamLead))}
                       </button>
                     </td>
                     <td className="px-2 py-2 text-right">
