@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDate } from "@/lib/datetime";
-import { isSuperadmin } from "@/lib/roles";
+import { isLeadAnalyst, isSuperadmin } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { usePresenceStore } from "@/store/presence-store";
 
@@ -28,7 +28,9 @@ export default function ProfilePage() {
   }
 
   const managerName = user.managerName?.trim();
-  const hasManager = Boolean(user.managerId?.trim() || managerName);
+  const hasManager =
+    !isLeadAnalyst(user.role) &&
+    Boolean(user.managerId?.trim() || managerName);
   const showTeam = !isSuperadmin(user.role);
 
   const rows: Array<{ label: string; value: string }> = [
