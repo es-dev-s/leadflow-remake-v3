@@ -6,9 +6,13 @@ import {
   COOKIE_SESSION,
   getAuthToken,
   setAuthToken,
+  setSessionId,
+  setSessionUserId,
+  clearSessionId,
 } from "@/lib/auth-token";
 import { resetClientState } from "@/lib/reset-client-state";
 import { writeCachedUser } from "@/lib/auth-user-cache";
+import { announceSession } from "@/lib/session-lock";
 import { realtime } from "@/lib/realtime";
 import type { PublicUser } from "@/lib/api";
 import {
@@ -22,9 +26,14 @@ type AuthState = {
   token: string | null;
   user: PublicUser | null;
   bootstrapped: boolean;
-  setSession: (token: string, expiresAt: string, user: PublicUser) => void;
+  setSession: (
+    token: string,
+    expiresAt: string,
+    user: PublicUser,
+    sessionId?: string,
+  ) => void;
   setUser: (user: PublicUser | null) => void;
-  clearSession: () => void;
+  clearSession: (opts?: { server?: boolean }) => void;
   markBootstrapped: () => void;
   hydrateToken: () => string | null;
 };
@@ -34,10 +43,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   bootstrapped: false,
 
-  setSession: (_token, expiresAt, user) => {
+  setSession: (_token, expiresAt, user, sessionId) => {
     const prevUserId = get().user?.id;
-    // Ignore JWT bodies — cookie is authoritative; store only a marker.
     setAuthToken(COOKIE_SESSION, expiresAt);
+    if (sessionId?.trim()) {
+      setSessionId(sessionId.trim());
+      setSessionUserId(user.id);
+      announceSession(sessionId.trim(), user.id);
+    }
     writeCachedUser(user);
     set({ token: COOKIE_SESSION, user, bootstrapped: true });
     if (prevUserId && prevUserId !== user.id) {
@@ -51,16 +64,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ user });
   },
 
-  clearSession: () => {
+  clearSession: (opts) => {
+    const server = opts?.server !== false;
     clearAuthToken();
+    if (server) clearSessionId();
     writeCachedUser(null);
     resetClientState();
     set({ token: null, user: null, bootstrapped: true });
-    void import("@/lib/api")
-      .then((m) => m.logoutRequest())
-      .catch(() => {
-        /* ignore */
-      });
+    if (server) {
+      void import("@/lib/api")
+        .then((m) => m.logoutRequest())
+        .catch(() => {
+          /* ignore */
+        });
+    }
     realtime.refreshAuth();
   },
 

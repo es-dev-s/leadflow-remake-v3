@@ -48,18 +48,24 @@ export const QUALIFICATION_OPTIONS = [
   { value: "QUALIFIED", label: "Qualified" },
   { value: "QUALIFIED_CHAT", label: "Qualified - Chat" },
   { value: "QUALIFIED_CALL", label: "Qualified - Call" },
+  { value: "PAID", label: "Paid" },
+  { value: "ORGANIC", label: "Organic" },
   { value: "NOT_QUALIFIED", label: "Not Qualified" },
   { value: "IRRELEVANT", label: "Irrelevant" },
 ] as const;
 
 export type QualificationValue = (typeof QUALIFICATION_OPTIONS)[number]["value"];
 
+const ASSIGNABLE_QUALIFICATIONS = new Set<string>([
+  "QUALIFIED",
+  "QUALIFIED_CHAT",
+  "QUALIFIED_CALL",
+  "PAID",
+  "ORGANIC",
+]);
+
 export function isAssignableQualification(status: string | null | undefined) {
-  return (
-    status === "QUALIFIED" ||
-    status === "QUALIFIED_CHAT" ||
-    status === "QUALIFIED_CALL"
-  );
+  return ASSIGNABLE_QUALIFICATIONS.has(String(status ?? "").trim());
 }
 
 export function qualificationLabel(status: string | null | undefined) {

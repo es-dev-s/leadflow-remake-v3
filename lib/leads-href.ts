@@ -139,6 +139,8 @@ export function qualificationDeepLink(statusKey: string): LeadsDeepLink {
     case "QUALIFIED":
     case "QUALIFIED_CALL":
     case "QUALIFIED_CHAT":
+    case "PAID":
+    case "ORGANIC":
       return { status: statusKey };
     default:
       return { status: statusKey };

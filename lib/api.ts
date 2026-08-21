@@ -1,6 +1,6 @@
 import type { CreateLeadPayload } from "@/lib/lead-form-options";
 import type { LeadRecord } from "@/lib/leads-data";
-import { clearAuthToken } from "@/lib/auth-token";
+import { clearAuthToken, getSessionId, SESSION_HEADER } from "@/lib/auth-token";
 import {
   clearQueryCache,
   readQueryCache,
@@ -44,21 +44,31 @@ export function isInactiveAccountError(
   return (message ?? "").toLowerCase().includes("inactive");
 }
 
-function redirectToLogin(reason?: "inactive") {
+export function isSessionReplacedError(
+  status: number,
+  message?: string | null,
+): boolean {
+  if (status !== 401) return false;
+  return (message ?? "").toLowerCase().includes("signed in elsewhere");
+}
+
+function redirectToLogin(reason?: "inactive" | "session") {
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith("/login")) return;
   if (handlingUnauthorized) return;
   handlingUnauthorized = true;
   clearAuthToken();
-  // Best-effort cookie clear (HttpOnly cookie is cleared by the API).
-  void fetch(`${BACKEND_URL}/api/auth/logout`, {
-    method: "POST",
-    credentials: "include",
-    cache: "no-store",
-  }).catch(() => {
-    /* ignore */
-  });
-  // Drop in-memory session data before hard redirect (avoids flash of prior user).
+  // Stale tabs share the HttpOnly cookie with the newer login. Do not clear
+  // that cookie or the live server session from this tab.
+  if (reason !== "session") {
+    void fetch(`${BACKEND_URL}/api/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+    }).catch(() => {
+      /* ignore */
+    });
+  }
   void import("@/lib/reset-client-state")
     .then((m) => m.resetClientState())
     .catch(() => {
@@ -68,6 +78,7 @@ function redirectToLogin(reason?: "inactive") {
   const query = new URLSearchParams();
   query.set("next", next || "/");
   if (reason === "inactive") query.set("reason", "inactive");
+  if (reason === "session") query.set("reason", "session");
   window.location.assign(`/login?${query.toString()}`);
 }
 
@@ -84,6 +95,10 @@ export async function apiFetch(
     ...rest
   } = options;
   const nextHeaders = new Headers(headers);
+  const sessionId = getSessionId();
+  if (sessionId && !nextHeaders.has(SESSION_HEADER)) {
+    nextHeaders.set(SESSION_HEADER, sessionId);
+  }
   // Auth is the HttpOnly cookie via credentials: "include" (no Bearer in JS).
   // Let the browser set multipart boundaries for FormData uploads.
   const isFormData =
@@ -115,7 +130,14 @@ export async function apiFetch(
     );
 
     if (res.status === 401 && auth && !skipAuthRedirect) {
-      redirectToLogin();
+      const elsewhere = await res
+        .clone()
+        .json()
+        .then((body: { error?: string }) =>
+          isSessionReplacedError(401, body?.error),
+        )
+        .catch(() => false);
+      redirectToLogin(elsewhere ? "session" : undefined);
     } else if (res.status === 403 && auth && !skipAuthRedirect) {
       void res
         .clone()
@@ -1260,6 +1282,7 @@ export async function fetchUsers(
 export type AuthResponse = {
   /** Present for API clients; browsers must not persist this. */
   token?: string;
+  sessionId?: string;
   expiresAt: string;
   user: PublicUser;
 };
@@ -1309,6 +1332,40 @@ export async function fetchMe(signal?: AbortSignal): Promise<PublicUser> {
   }
   const data = (await res.json()) as { user: PublicUser };
   return data.user;
+}
+
+/** Take over the sole live session for this tab (kicks every other window). */
+export async function claimSessionRequest(
+  signal?: AbortSignal,
+): Promise<AuthResponse> {
+  const res = await apiFetch("/api/auth/session/claim", {
+    method: "POST",
+    signal,
+    skipAuthRedirect: true,
+  });
+  if (!res.ok) {
+    throw await readApiError(res, "Session expired");
+  }
+  return (await res.json()) as AuthResponse;
+}
+
+/**
+ * Validate the cookie, then mint a per-tab session id when this window does
+ * not already have one — otherwise two windows share the cookie and both stay in.
+ */
+export async function hydrateBrowserSession(
+  signal?: AbortSignal,
+): Promise<{ user: PublicUser; sessionId?: string }> {
+  const user = await fetchMe(signal);
+  const existing = getSessionId();
+  if (existing) {
+    return { user, sessionId: existing };
+  }
+  const claimed = await claimSessionRequest(signal);
+  return {
+    user: claimed.user ?? user,
+    sessionId: claimed.sessionId,
+  };
 }
 
 export async function fetchRoles(

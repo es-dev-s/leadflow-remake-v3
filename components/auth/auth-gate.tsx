@@ -3,11 +3,18 @@
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, fetchMe, isInactiveAccountError } from "@/lib/api";
-import { COOKIE_SESSION, getAuthToken } from "@/lib/auth-token";
+import {
+  ApiError,
+  fetchMe,
+  hydrateBrowserSession,
+  isInactiveAccountError,
+  isSessionReplacedError,
+} from "@/lib/api";
+import { COOKIE_SESSION, getAuthToken, getSessionId } from "@/lib/auth-token";
 import { readCachedUser, writeCachedUser } from "@/lib/auth-user-cache";
 import { isAbortError } from "@/lib/reset-client-state";
 import { subscribeRealtime } from "@/lib/realtime";
+import { subscribeSessionLock } from "@/lib/session-lock";
 import { useAuthStore } from "@/store/auth-store";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -20,7 +27,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser);
   const clearSession = useAuthStore((s) => s.clearSession);
   const markBootstrapped = useAuthStore((s) => s.markBootstrapped);
-  const [ready, setReady] = useState(() => Boolean(useAuthStore.getState().user));
+  const [ready, setReady] = useState(
+    () => Boolean(useAuthStore.getState().user && getSessionId()),
+  );
 
   useEffect(() => {
     hydrateToken();
@@ -35,19 +44,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         hadUser = true;
       }
     }
-    if (hadUser) {
-      markBootstrapped();
-      setReady(true);
-    }
-
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     const sessionAtStart = getAuthToken();
 
-    void fetchMe(controller.signal)
-      .then((me) => {
+    void hydrateBrowserSession(controller.signal)
+      .then(({ user: me, sessionId }) => {
         if (controller.signal.aborted) return;
-        setSession(COOKIE_SESSION, "", me);
+        setSession(COOKIE_SESSION, "", me, sessionId);
         markBootstrapped();
         setReady(true);
       })
@@ -67,6 +71,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         }
 
         const apiErr = err instanceof ApiError ? err : null;
+        const sessionTaken =
+          apiErr != null &&
+          isSessionReplacedError(apiErr.status, apiErr.message);
         const forceLogout =
           apiErr?.status === 401 ||
           (apiErr != null &&
@@ -80,11 +87,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
         markBootstrapped();
         writeCachedUser(null);
-        clearSession();
+        clearSession({ server: sessionTaken ? false : undefined });
         router.replace(
           apiErr && isInactiveAccountError(apiErr.status, apiErr.message)
             ? "/login?reason=inactive"
-            : "/login",
+            : sessionTaken
+              ? "/login?reason=session"
+              : "/login",
         );
       })
       .finally(() => {
@@ -104,11 +113,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     router,
   ]);
 
-  // Force logout when this account is deactivated while still logged in.
+  // Force logout when this account is deactivated while still logged in,
+  // or when another window takes over the live session.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!ready || !user?.id) return;
 
-    return subscribeRealtime((evt) => {
+    const kickForSession = () => {
+      writeCachedUser(null);
+      clearSession({ server: false });
+      router.replace("/login?reason=session");
+    };
+
+    const unsubRealtime = subscribeRealtime((evt) => {
+      if (evt.type === "auth.session_replaced") {
+        kickForSession();
+        return;
+      }
       if (evt.type !== "user.updated" || evt.userId !== user.id) return;
 
       void fetchMe()
@@ -124,17 +144,34 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         .catch((err: unknown) => {
           const apiErr = err instanceof ApiError ? err : null;
           if (
+            apiErr != null &&
+            isSessionReplacedError(apiErr.status, apiErr.message)
+          ) {
+            kickForSession();
+            return;
+          }
+          if (
             apiErr?.status === 401 ||
             (apiErr != null &&
               isInactiveAccountError(apiErr.status, apiErr.message))
           ) {
             writeCachedUser(null);
             clearSession();
-            router.replace("/login?reason=inactive");
+            router.replace(
+              apiErr && isInactiveAccountError(apiErr.status, apiErr.message)
+                ? "/login?reason=inactive"
+                : "/login",
+            );
           }
         });
     });
-  }, [user?.id, clearSession, router, setUser]);
+
+    const unsubLock = subscribeSessionLock(user.id, kickForSession);
+    return () => {
+      unsubRealtime();
+      unsubLock();
+    };
+  }, [ready, user?.id, clearSession, router, setUser]);
 
   if (!bootstrapped || !token || !user || !ready) {
     return (

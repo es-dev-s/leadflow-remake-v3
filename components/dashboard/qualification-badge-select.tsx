@@ -20,6 +20,10 @@ function badgeClass(status: string) {
       return "border-[rgba(34,139,230,0.28)] bg-[#e7f5ff] text-[#1864ab]";
     case "QUALIFIED_CALL":
       return "border-[rgba(232,104,18,0.28)] bg-[#fff4e6] text-[#9a3f00]";
+    case "PAID":
+      return "border-[rgba(9,146,104,0.28)] bg-[#e6fcf5] text-[#087f5b]";
+    case "ORGANIC":
+      return "border-[rgba(92,124,250,0.28)] bg-[#edf2ff] text-[#3b5bdb]";
     case "NOT_QUALIFIED":
       return "border-[rgba(33,37,41,0.12)] bg-[#f1f3f5] text-[#495057]";
     case "IRRELEVANT":

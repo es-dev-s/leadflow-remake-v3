@@ -39,6 +39,16 @@ const STATUS_STYLE: Record<
     shortLabel: "Chat",
     tone: "#f59e0b",
   },
+  PAID: {
+    label: "Paid",
+    shortLabel: "Paid",
+    tone: "#0ca678",
+  },
+  ORGANIC: {
+    label: "Organic",
+    shortLabel: "Organic",
+    tone: "#4c6ef5",
+  },
   NOT_QUALIFIED: {
     label: "Not Qualified",
     shortLabel: "Not qual.",

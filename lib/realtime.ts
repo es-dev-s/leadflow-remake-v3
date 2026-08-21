@@ -1,5 +1,6 @@
-import { BACKEND_URL } from "@/lib/api";
-import { getAuthToken } from "@/lib/auth-token";
+import { BACKEND_URL, ApiError, fetchMe, isSessionReplacedError } from "@/lib/api";
+import { getAuthToken, getSessionId } from "@/lib/auth-token";
+import { getLiveSession, liveSessionReplacedThisTab } from "@/lib/session-lock";
 import { clearQueryCache } from "@/lib/query-cache";
 
 export type RealtimeEvent = {
@@ -36,9 +37,20 @@ class RealtimeClient {
     };
   }
 
+  private emitSessionReplaced() {
+    const evt: RealtimeEvent = { type: "auth.session_replaced" };
+    for (const listener of this.listeners) {
+      try {
+        listener(evt);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   /** Call after login / logout so the stream re-auths with the new session. */
   refreshAuth() {
-    const next = getAuthToken();
+    const next = `${getAuthToken() ?? ""}:${getSessionId() ?? ""}`;
     if (next === this.sessionMarker && this.source) return;
     this.reconnect();
   }
@@ -67,14 +79,24 @@ class RealtimeClient {
     if (typeof window === "undefined") return;
     if (this.source) return;
 
-    const marker = getAuthToken();
+    const marker = `${getAuthToken() ?? ""}:${getSessionId() ?? ""}`;
     this.sessionMarker = marker;
-    if (!marker) {
+    if (!getAuthToken()) {
       this.scheduleReconnect(2000);
       return;
     }
 
-    const url = `${BACKEND_URL}/api/events`;
+    const sid = getSessionId();
+    if (liveSessionReplacedThisTab()) {
+      this.emitSessionReplaced();
+      return;
+    }
+    if (!sid) {
+      this.scheduleReconnect(500);
+      return;
+    }
+
+    const url = `${BACKEND_URL}/api/events?sid=${encodeURIComponent(sid)}`;
 
     let es: EventSource;
     try {
@@ -98,6 +120,15 @@ class RealtimeClient {
         return;
       }
       if (!parsed || !parsed.type) return;
+      if (parsed.type === "auth.session_replaced") {
+        const live = getLiveSession();
+        const mine = getSessionId();
+        if (live && mine && live.sessionId === mine) {
+          return;
+        }
+        this.emitSessionReplaced();
+        return;
+      }
       if (!parsed.type.startsWith("presence.")) {
         clearQueryCache();
       }
@@ -113,7 +144,26 @@ class RealtimeClient {
     es.onerror = () => {
       es.close();
       if (this.source === es) this.source = null;
-      this.scheduleReconnect();
+      void fetchMe()
+        .then(() => {
+          if (liveSessionReplacedThisTab()) {
+            this.emitSessionReplaced();
+            return;
+          }
+          this.scheduleReconnect();
+        })
+        .catch((err: unknown) => {
+          const apiErr = err instanceof ApiError ? err : null;
+          if (
+            apiErr?.status === 401 ||
+            (apiErr != null &&
+              isSessionReplacedError(apiErr.status, apiErr.message))
+          ) {
+            this.emitSessionReplaced();
+            return;
+          }
+          this.scheduleReconnect();
+        });
     };
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError, fetchMe, loginRequest } from "@/lib/api";
+import { ApiError, hydrateBrowserSession, loginRequest } from "@/lib/api";
 import { COOKIE_SESSION, clearAuthToken, getAuthToken } from "@/lib/auth-token";
 import { isAbortError } from "@/lib/reset-client-state";
 import { useAuthStore } from "@/store/auth-store";
@@ -36,15 +36,17 @@ function LoginForm() {
   }, [searchParams]);
 
   const deactivatedNotice = searchParams.get("reason") === "inactive";
+  const sessionReplacedNotice = searchParams.get("reason") === "session";
 
   useEffect(() => {
+    if (sessionReplacedNotice) return;
     // Always probe the HttpOnly cookie — no JWT in JS storage.
     const controller = new AbortController();
     bootstrapAbortRef.current = controller;
-    void fetchMe(controller.signal)
-      .then((user) => {
+    void hydrateBrowserSession(controller.signal)
+      .then(({ user, sessionId }) => {
         if (controller.signal.aborted) return;
-        setSession(COOKIE_SESSION, "", user);
+        setSession(COOKIE_SESSION, "", user, sessionId);
         (document.activeElement as HTMLElement | null)?.blur?.();
         router.replace(nextPath);
       })
@@ -58,7 +60,7 @@ function LoginForm() {
         bootstrapAbortRef.current = null;
       }
     };
-  }, [nextPath, router, setSession]);
+  }, [nextPath, router, setSession, sessionReplacedNotice]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -75,7 +77,7 @@ function LoginForm() {
 
     try {
       const result = await loginRequest(cleanEmail, cleanPassword);
-      setSession(COOKIE_SESSION, result.expiresAt, result.user);
+      setSession(COOKIE_SESSION, result.expiresAt, result.user, result.sessionId);
       (document.activeElement as HTMLElement | null)?.blur?.();
       router.replace(nextPath);
     } catch (err: unknown) {
@@ -181,6 +183,12 @@ function LoginForm() {
               ) : null}
             </div>
           </div>
+
+          {sessionReplacedNotice ? (
+            <p className="mt-4 rounded-lg border border-[rgba(232,104,18,0.22)] bg-[#fff7ef] px-3 py-2 text-[12px] text-[#9a3f00]">
+              You were signed out because this account signed in somewhere else.
+            </p>
+          ) : null}
 
           {deactivatedNotice ? (
             <p className="mt-4 rounded-lg border border-[rgba(232,104,18,0.22)] bg-[#fff7ef] px-3 py-2 text-[12px] text-[#9a3f00]">
