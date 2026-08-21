@@ -123,33 +123,35 @@ export function SalesExecOutcomesTable() {
         </div>
       ) : (
         <div className={dashboardCardListClass(page.expanded)}>
-          <table className="w-full min-w-[820px] border-collapse text-left">
+          <table className="w-full min-w-[820px] border-collapse text-center">
             <thead className="sticky top-0 z-10 bg-[#f8f9fa]">
               <tr className="border-b border-[rgba(33,37,41,0.05)] text-[10px] font-medium tracking-[0.06em] text-[#adb5bd] uppercase">
-                <th className="w-10 px-3.5 py-2 font-medium @[28rem]:px-5">
+                <th className="w-10 px-3.5 py-2 text-center font-medium @[28rem]:px-5">
                   #
                 </th>
-                <th className="px-2 py-2 font-medium">Sales executive</th>
-                <th className="hidden min-w-[120px] px-2 py-2 font-medium @[48rem]:table-cell">
+                <th className="px-2 py-2 text-center font-medium">
+                  Sales executive
+                </th>
+                <th className="hidden min-w-[120px] px-2 py-2 text-center font-medium @[48rem]:table-cell">
                   Share
                 </th>
-                <th className="px-2 py-2 text-right font-medium">Leads</th>
+                <th className="px-2 py-2 text-center font-medium">Leads</th>
                 <th
-                  className="px-2 py-2 text-right font-medium"
+                  className="px-2 py-2 text-center font-medium"
                   title="Sales stage: With executive"
                 >
                   Active leads
                 </th>
                 <th
-                  className="px-2 py-2 text-right font-medium"
+                  className="px-2 py-2 text-center font-medium"
                   title="Not connected, in negotiation, or no response"
                 >
                   In progress
                 </th>
-                <th className="px-2 py-2 text-right font-medium">Won</th>
-                <th className="px-2 py-2 text-right font-medium">Lost</th>
+                <th className="px-2 py-2 text-center font-medium">Won</th>
+                <th className="px-2 py-2 text-center font-medium">Lost</th>
                 <th
-                  className="px-3.5 py-2 text-right font-medium @[28rem]:px-5"
+                  className="px-3.5 py-2 text-center font-medium @[28rem]:px-5"
                   title="Pre-sales and any stage outside the other columns"
                 >
                   Other
@@ -164,14 +166,14 @@ export function SalesExecOutcomesTable() {
                     key={row.id || row.name}
                     className="border-b border-[rgba(33,37,41,0.04)] bg-white last:border-b-0 hover:bg-[#fafbfc]"
                   >
-                    <td className="px-3.5 py-2 text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-center text-[11px] tabular-nums text-[#adb5bd] @[28rem]:px-5">
                       {String(index + 1).padStart(2, "0")}
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
-                        className="lf-pressable flex min-w-0 items-center gap-2 text-left"
+                        className="lf-pressable mx-auto flex min-w-0 items-center justify-center gap-2 text-center"
                         title={`Open leads for ${row.name || "executive"}`}
                       >
                         <p className="truncate text-[13px] font-medium text-[#212529] hover:underline">
@@ -179,11 +181,11 @@ export function SalesExecOutcomesTable() {
                         </p>
                       </button>
                     </td>
-                    <td className="hidden px-2 py-2 @[48rem]:table-cell">
+                    <td className="hidden px-2 py-2 text-center @[48rem]:table-cell">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
-                        className="lf-pressable block w-full"
+                        className="lf-pressable mx-auto block w-full max-w-[160px]"
                       >
                         <span className="block h-1 w-full overflow-hidden rounded-full bg-[rgba(33,37,41,0.06)]">
                           <span
@@ -193,7 +195,7 @@ export function SalesExecOutcomesTable() {
                         </span>
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openExec(row)}
@@ -202,7 +204,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(n(row.assigned))}
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() =>
@@ -213,7 +215,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(n(row.withRep))}
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() =>
@@ -224,7 +226,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(n(row.inProgress))}
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openExec(row, { filter: "converted" })}
@@ -233,7 +235,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(n(row.won))}
                       </button>
                     </td>
-                    <td className="px-2 py-2 text-right">
+                    <td className="px-2 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => openExec(row, { filter: "lost" })}
@@ -242,7 +244,7 @@ export function SalesExecOutcomesTable() {
                         {formatCount(n(row.lost))}
                       </button>
                     </td>
-                    <td className="px-3.5 py-2 text-right @[28rem]:px-5">
+                    <td className="px-3.5 py-2 text-center @[28rem]:px-5">
                       <button
                         type="button"
                         onClick={() =>
