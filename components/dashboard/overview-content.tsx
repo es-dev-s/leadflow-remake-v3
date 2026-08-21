@@ -197,7 +197,7 @@ export function OverviewContent() {
           {
             label: "Active users",
             value: formatCount(liveActiveUsers ?? summary?.activeUsers),
-            href: canViewUsers(role) ? "/users" : undefined,
+            href: canViewUsers(role) ? "/users?online=1" : undefined,
           },
         ]),
     {

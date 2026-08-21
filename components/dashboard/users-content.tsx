@@ -7,6 +7,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { CreateUserModal } from "@/components/dashboard/create-user-modal";
 import { EditUserModal } from "@/components/dashboard/edit-user-modal";
@@ -42,6 +43,16 @@ function initials(name: string) {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
 }
 
+function isOnlineNow(
+  user: PublicUser,
+  presenceHydrated: boolean,
+  presenceById: Record<string, unknown>,
+) {
+  return presenceHydrated
+    ? Boolean(presenceById[user.id])
+    : user.isActiveSession;
+}
+
 function roleTone(role: string) {
   switch (role) {
     case "SUPERADMIN":
@@ -59,9 +70,13 @@ function roleTone(role: string) {
 }
 
 export function UsersContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const currentUser = useAuthStore((s) => s.user);
   const presenceById = usePresenceStore((s) => s.byId);
   const presenceHydrated = usePresenceStore((s) => s.hydrated);
+  const onlineOnly =
+    searchParams.get("online") === "1" || searchParams.get("active") === "1";
   const canManage = canManageUsers(currentUser);
   const tabs = useMemo(
     () => userManagementTabs(currentUser?.role),
@@ -72,7 +87,9 @@ export function UsersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState(() => tabs[0]?.id ?? "all");
+  const [roleFilter, setRoleFilter] = useState(() =>
+    onlineOnly ? "all" : tabs[0]?.id ?? "all",
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<PublicUser | null>(null);
   const [transferringSe, setTransferringSe] = useState<PublicUser | null>(null);
@@ -106,11 +123,16 @@ export function UsersContent() {
   }
 
   useEffect(() => {
+    if (onlineOnly) setRoleFilter("all");
+  }, [onlineOnly]);
+
+  useEffect(() => {
+    if (onlineOnly) return;
     if (!tabs.length) return;
     if (!tabs.some((tab) => tab.id === roleFilter)) {
       setRoleFilter(tabs[0].id);
     }
-  }, [tabs, roleFilter]);
+  }, [onlineOnly, tabs, roleFilter]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -202,6 +224,12 @@ export function UsersContent() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return users.filter((user) => {
+      if (
+        onlineOnly &&
+        !isOnlineNow(user, presenceHydrated, presenceById)
+      ) {
+        return false;
+      }
       if (roleFilter !== "all" && user.role !== roleFilter) return false;
       if (!q) return true;
       const haystack = [
@@ -216,7 +244,7 @@ export function UsersContent() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [users, query, roleFilter]);
+  }, [users, query, roleFilter, onlineOnly, presenceHydrated, presenceById]);
 
   const preferredCreateRole =
     roleFilter !== "all" ? roleFilter : undefined;
@@ -264,10 +292,14 @@ export function UsersContent() {
   const activeCount = useMemo(
     () =>
       users.filter((user) =>
-        presenceHydrated ? Boolean(presenceById[user.id]) : user.isActiveSession,
+        isOnlineNow(user, presenceHydrated, presenceById),
       ).length,
     [users, presenceById, presenceHydrated],
   );
+
+  function setOnlineFilter(enabled: boolean) {
+    router.replace(enabled ? "/users?online=1" : "/users");
+  }
 
   return (
     <section className="@container flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-[rgba(33,37,41,0.06)] bg-white">
@@ -287,16 +319,35 @@ export function UsersContent() {
           <div className="flex flex-wrap items-center gap-2">
             {!loading ? (
               <>
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(33,37,41,0.1)] bg-[#f8f9fa] px-2.5 py-1 text-[11px] tabular-nums text-[#212529]">
+                <button
+                  type="button"
+                  onClick={() => setOnlineFilter(false)}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] tabular-nums",
+                    !onlineOnly
+                      ? "border-[rgba(33,37,41,0.1)] bg-[#f8f9fa] text-[#212529]"
+                      : "border-[rgba(33,37,41,0.08)] bg-white text-[#868e96] hover:text-[#212529]",
+                  ].join(" ")}
+                >
                   <span className="text-[#868e96]">Total</span>
                   <span className="font-medium">
                     {formatCount(total || users.length)}
                   </span>
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(47,158,68,0.22)] bg-[#ebfbee] px-2.5 py-1 text-[11px] tabular-nums text-[#2b8a3e]">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlineFilter(!onlineOnly)}
+                  aria-pressed={onlineOnly}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] tabular-nums",
+                    onlineOnly
+                      ? "border-[rgba(47,158,68,0.35)] bg-[#ebfbee] text-[#2b8a3e]"
+                      : "border-[rgba(47,158,68,0.22)] bg-[#ebfbee] text-[#2b8a3e]",
+                  ].join(" ")}
+                >
                   <span className="opacity-80">Active</span>
                   <span className="font-medium">{formatCount(activeCount)}</span>
-                </span>
+                </button>
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(33,37,41,0.1)] bg-white px-2.5 py-1 text-[11px] tabular-nums text-[#212529]">
                   <span className="text-[#868e96]">Showing</span>
                   <span className="font-medium">
@@ -383,6 +434,22 @@ export function UsersContent() {
           </div>
         </div>
 
+        {onlineOnly ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-lg border border-[rgba(47,158,68,0.22)] bg-[#ebfbee] px-2.5 py-1 text-[11px] text-[#2b8a3e]">
+              Online now
+            </span>
+            <button
+              type="button"
+              onClick={() => setOnlineFilter(false)}
+              className="lf-pressable inline-flex items-center gap-1 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white px-2.5 py-1 text-[11px] font-medium text-[#868e96] hover:text-[#212529]"
+            >
+              <X size={11} strokeWidth={1.75} />
+              Clear
+            </button>
+          </div>
+        ) : null}
+
         {actionNotice ? (
           <div className="flex items-start justify-between gap-3 rounded-xl border border-[rgba(47,158,68,0.22)] bg-[#ebfbee] px-3 py-2">
             <p className="text-[12px] text-[#2b8a3e]">{actionNotice}</p>
@@ -417,7 +484,11 @@ export function UsersContent() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-4 py-8 text-center">
           <p className="text-[13px] text-[#6c757d]">
-            {loading ? "Loading users…" : "No users match this filter."}
+            {loading
+              ? "Loading users…"
+              : onlineOnly
+                ? "No users are online right now."
+                : "No users match this filter."}
           </p>
         </div>
       ) : (
@@ -444,9 +515,11 @@ export function UsersContent() {
             <tbody>
               {filtered.map((user, index) => {
                 const isSelf = currentUser?.id === user.id;
-                const online = presenceHydrated
-                  ? Boolean(presenceById[user.id])
-                  : user.isActiveSession;
+                const online = isOnlineNow(
+                  user,
+                  presenceHydrated,
+                  presenceById,
+                );
                 const accountActive = user.isActive !== false;
                 const canAct =
                   canManage &&
