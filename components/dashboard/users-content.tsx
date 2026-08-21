@@ -217,6 +217,8 @@ export function UsersContent() {
   const preferredCreateRole =
     roleFilter !== "all" ? roleFilter : undefined;
 
+  const showTeamColumn = roleFilter !== Role.LeadAnalyst;
+
   const pageSubtitle = isAnalystTeamLead(currentUser?.role)
     ? "Manage Lead Analysts, Main Team Leads, and Sales Executives"
     : isMainTeamLead(currentUser?.role)
@@ -399,7 +401,9 @@ export function UsersContent() {
                 <th className="w-10 px-3.5 py-2.5 font-medium @[28rem]:px-5">#</th>
                 <th className="px-2 py-2.5 font-medium">User</th>
                 <th className="px-2 py-2.5 font-medium">Role</th>
-                <th className="px-2 py-2.5 font-medium">Team</th>
+                {showTeamColumn ? (
+                  <th className="px-2 py-2.5 font-medium">Team</th>
+                ) : null}
                 <th className="px-2 py-2.5 font-medium">Session</th>
                 {canManage ? (
                   <th className="px-2 py-2.5 font-medium">Account</th>
@@ -473,11 +477,13 @@ export function UsersContent() {
                         {user.roleLabel}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5">
-                      <p className="truncate text-[13px] text-[#212529]">
-                        {user.teamName || user.analystTeamName || "—"}
-                      </p>
-                    </td>
+                    {showTeamColumn ? (
+                      <td className="px-2 py-2.5">
+                        <p className="truncate text-[13px] text-[#212529]">
+                          {user.teamName || user.analystTeamName || "—"}
+                        </p>
+                      </td>
+                    ) : null}
                     <td className="px-2 py-2.5">
                       <span className="inline-flex items-center gap-1.5 text-[12px]">
                         <span
