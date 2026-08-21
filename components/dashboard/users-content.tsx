@@ -11,15 +11,18 @@ import { useEffect, useMemo, useState } from "react";
 import { CreateUserModal } from "@/components/dashboard/create-user-modal";
 import { EditUserModal } from "@/components/dashboard/edit-user-modal";
 import { TransferSeModal } from "@/components/dashboard/transfer-se-modal";
+import { TransferLaModal } from "@/components/dashboard/transfer-la-modal";
 import {
   fetchUsers,
   setUserActiveRequest,
+  type AnalystTeamBrief,
   type PublicUser,
 } from "@/lib/api";
 import {
   canActOnUserRole,
   isAnalystTeamLead,
   isMainTeamLead,
+  isSuperadmin,
   Role,
   userManagementTabs,
 } from "@/lib/roles";
@@ -72,7 +75,8 @@ export function UsersContent() {
   const [roleFilter, setRoleFilter] = useState(() => tabs[0]?.id ?? "all");
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<PublicUser | null>(null);
-  const [transferring, setTransferring] = useState<PublicUser | null>(null);
+  const [transferringSe, setTransferringSe] = useState<PublicUser | null>(null);
+  const [transferringLa, setTransferringLa] = useState<PublicUser | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [togglingActiveId, setTogglingActiveId] = useState<string | null>(null);
@@ -231,6 +235,31 @@ export function UsersContent() {
     canManage &&
     user.role === Role.SalesExecutive &&
     canActOnUserRole(currentUser?.role, user.role);
+
+  const canTransferLa = (user: PublicUser) =>
+    canManage &&
+    user.role === Role.LeadAnalyst &&
+    canActOnUserRole(currentUser?.role, user.role) &&
+    (isSuperadmin(currentUser?.role) || isAnalystTeamLead(currentUser?.role));
+
+  const analystTeamOptions = useMemo((): AnalystTeamBrief[] => {
+    const map = new Map<string, AnalystTeamBrief>();
+    for (const row of users) {
+      if (row.role !== Role.AnalystTeamLead) continue;
+      const name = row.analystTeamName?.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (map.has(key)) continue;
+      map.set(key, {
+        name,
+        leadId: row.id,
+        leadName: row.name,
+      });
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
+  }, [users]);
 
   const activeCount = useMemo(
     () =>
@@ -582,7 +611,20 @@ export function UsersContent() {
                                 type="button"
                                 onClick={() => {
                                   setActionError(null);
-                                  setTransferring(user);
+                                  setTransferringSe(user);
+                                }}
+                                className="lf-pressable inline-flex h-8 items-center gap-1 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white px-2.5 text-[11px] font-medium text-[#495057] hover:bg-[#f8f9fa]"
+                              >
+                                <ArrowRightLeft size={12} strokeWidth={1.75} />
+                                Transfer
+                              </button>
+                            ) : null}
+                            {canTransferLa(user) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionError(null);
+                                  setTransferringLa(user);
                                 }}
                                 className="lf-pressable inline-flex h-8 items-center gap-1 rounded-lg border border-[rgba(33,37,41,0.08)] bg-white px-2.5 text-[11px] font-medium text-[#495057] hover:bg-[#f8f9fa]"
                               >
@@ -639,9 +681,9 @@ export function UsersContent() {
       />
 
       <TransferSeModal
-        open={Boolean(transferring)}
-        user={transferring}
-        onClose={() => setTransferring(null)}
+        open={Boolean(transferringSe)}
+        user={transferringSe}
+        onClose={() => setTransferringSe(null)}
         onTransferred={(user, leadsMoved, toTeamName) => {
           if (isMainTeamLead(currentUser?.role)) {
             setUsers((prev) => prev.filter((row) => row.id !== user.id));
@@ -658,6 +700,20 @@ export function UsersContent() {
                 ? ` · ${leadsMoved.toLocaleString("en-US")} lead${leadsMoved === 1 ? "" : "s"} updated`
                 : ""),
           );
+        }}
+      />
+
+      <TransferLaModal
+        open={Boolean(transferringLa)}
+        user={transferringLa}
+        fallbackTeams={analystTeamOptions}
+        onClose={() => setTransferringLa(null)}
+        onTransferred={(user, _leadsOwned, toTeamName) => {
+          setUsers((prev) =>
+            prev.map((row) => (row.id === user.id ? user : row)),
+          );
+          setActionError(null);
+          setActionNotice(`${user.name} moved to ${toTeamName}`);
         }}
       />
     </section>

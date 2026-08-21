@@ -1451,6 +1451,37 @@ export type TeamBrief = {
   name: string;
 };
 
+export type AnalystTeamBrief = {
+  name: string;
+  leadId: string;
+  leadName: string;
+};
+
+export function isAnalystTeamBrief(value: unknown): value is AnalystTeamBrief {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.name === "string" &&
+    row.name.trim().length > 0 &&
+    typeof row.leadId === "string" &&
+    row.leadId.trim().length > 0
+  );
+}
+
+function parseAnalystTeams(raw: unknown): AnalystTeamBrief[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isAnalystTeamBrief);
+}
+
+function looksLikeSalesTeams(raw: unknown): boolean {
+  if (!Array.isArray(raw) || raw.length === 0) return false;
+  return raw.some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const row = item as Record<string, unknown>;
+    return typeof row.id === "string" && !row.leadId;
+  });
+}
+
 export async function fetchTeams(signal?: AbortSignal): Promise<TeamBrief[]> {
   const res = await apiFetch("/api/teams", { signal });
   if (!res.ok) {
@@ -1458,6 +1489,28 @@ export async function fetchTeams(signal?: AbortSignal): Promise<TeamBrief[]> {
   }
   const data = (await res.json()) as { teams?: TeamBrief[] };
   return Array.isArray(data.teams) ? data.teams : [];
+}
+
+export async function fetchAnalystTeams(
+  signal?: AbortSignal,
+): Promise<AnalystTeamBrief[]> {
+  const paths = ["/api/teams?scope=analyst", "/api/analyst-teams"];
+  let lastError: ApiError | null = null;
+  for (const path of paths) {
+    const res = await apiFetch(path, { signal });
+    if (res.ok) {
+      const data = (await res.json()) as { teams?: unknown[] };
+      const teams = parseAnalystTeams(data.teams);
+      if (teams.length > 0) return teams;
+      // Older backends ignore scope=analyst and return sales teams instead.
+      if (looksLikeSalesTeams(data.teams)) continue;
+      return [];
+    }
+    lastError = await readApiError(res, "Failed to load analyst teams");
+    if (res.status === 404) continue;
+    throw lastError;
+  }
+  throw lastError ?? new ApiError("Failed to load analyst teams", 404);
 }
 
 export async function transferSalesExecRequest(
@@ -1494,6 +1547,48 @@ export async function transferSalesExecRequest(
     transferId: string;
     fromTeamId: string | null;
     toTeamId: string;
+  };
+}
+
+export async function transferLeadAnalystRequest(
+  id: string,
+  payload: {
+    toLeadId: string;
+    toTeamName?: string | null;
+    expectedTeamName?: string | null;
+  },
+  signal?: AbortSignal,
+): Promise<{
+  user: PublicUser;
+  leadsOwned: number;
+  fromTeamName: string | null;
+  toTeamName: string;
+}> {
+  const body: Record<string, unknown> = {
+    toLeadId: payload.toLeadId,
+  };
+  if (payload.toTeamName?.trim()) {
+    body.toTeamName = payload.toTeamName.trim();
+  }
+  if (payload.expectedTeamName) {
+    body.expectedTeamName = payload.expectedTeamName;
+  }
+  const res = await apiFetch(
+    `/api/users/${encodeURIComponent(id)}/transfer-analyst-team`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    throw await readApiError(res, "Failed to transfer lead analyst");
+  }
+  return (await res.json()) as {
+    user: PublicUser;
+    leadsOwned: number;
+    fromTeamName: string | null;
+    toTeamName: string;
   };
 }
 
