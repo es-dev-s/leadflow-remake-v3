@@ -14,6 +14,7 @@ import { BACKEND_URL, uploadFirstResponseProof } from "@/lib/api";
 type Props = {
   value: string;
   disabled?: boolean;
+  required?: boolean;
   onChange: (path: string) => void;
 };
 
@@ -23,7 +24,12 @@ function proofSrc(path: string) {
   return path.startsWith("http") ? path : `${BACKEND_URL}${path}`;
 }
 
-export function FirstResponseProofDrop({ value, disabled, onChange }: Props) {
+export function FirstResponseProofDrop({
+  value,
+  disabled,
+  required,
+  onChange,
+}: Props) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -101,6 +107,15 @@ export function FirstResponseProofDrop({ value, disabled, onChange }: Props) {
 
   return (
     <div className="sm:col-span-2">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <p className="text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+          Screenshot proof
+          {required ? <span className="ml-1 text-[#e86812]">*</span> : null}
+        </p>
+        {required && !value ? (
+          <span className="text-[11px] text-[#c92a2a]">Required to create</span>
+        ) : null}
+      </div>
       <input
         ref={inputRef}
         id={inputId}
@@ -193,7 +208,9 @@ export function FirstResponseProofDrop({ value, disabled, onChange }: Props) {
             {uploading ? "Uploading screenshot…" : "Drop screenshot proof"}
           </p>
           <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-[#868e96]">
-            JPEG, PNG, or WebP · up to 5 MB · first-message reply evidence
+            {required
+              ? "Required · JPEG, PNG, or WebP · up to 5 MB"
+              : "JPEG, PNG, or WebP · up to 5 MB · first-message reply evidence"}
           </p>
         </div>
       )}

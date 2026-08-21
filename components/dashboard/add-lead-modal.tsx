@@ -591,6 +591,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     if (!form.qualificationStatus) return false;
     if (portalIsOther && !form.portalOther.trim()) return false;
     if (Number.isNaN(firstResponseMinutes)) return false;
+    if (!isEdit && !form.firstResponseProofPath.trim()) return false;
     return true;
   }, [
     form,
@@ -615,6 +616,10 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     if (!canSubmit || submitting) return;
     if (!isEdit && !allowCreate) return;
     if (isEdit && !allowProfileEdit) return;
+    if (!isEdit && !form.firstResponseProofPath.trim()) {
+      setError("Attach a screenshot before creating this lead");
+      return;
+    }
 
     const portalWebsite = portalIsOther
       ? form.portalOther.trim()
@@ -1147,7 +1152,11 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
             <Section
               title="First response"
-              description="Record first client and first agent message times. Duration is calculated automatically. Attach screenshot proof."
+              description={
+                isEdit
+                  ? "Record first client and first agent message times. Duration is calculated automatically. Attach screenshot proof."
+                  : "Record first client and first agent message times. A screenshot of the first-message reply is required."
+              }
             >
               <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
                 <div className="min-w-0">
@@ -1204,6 +1213,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
               <FirstResponseProofDrop
                 value={form.firstResponseProofPath}
                 disabled={loading}
+                required={!isEdit}
                 onChange={(path) => set("firstResponseProofPath")(path)}
               />
             </Section>
