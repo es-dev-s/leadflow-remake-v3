@@ -34,3 +34,10 @@ export type LeadRecord = {
   handoff: string;
   isNew?: boolean;
 };
+
+export function isLeadNotAppropriate(
+  lead: { notAppropriate?: boolean; tag?: string } | null | undefined,
+): boolean {
+  if (!lead) return false;
+  return Boolean(lead.notAppropriate) || lead.tag === "Not appropriate";
+}

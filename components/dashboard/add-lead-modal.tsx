@@ -33,6 +33,7 @@ import {
   phoneDigits,
 } from "@/lib/country-dial-codes";
 import { canChangeQualification, canCreateLeads, canEditLeadProfile } from "@/lib/roles";
+import { isLeadNotAppropriate } from "@/lib/leads-data";
 import { useAuthStore } from "@/store/auth-store";
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { LoaderCircle, X } from "lucide-react";
@@ -328,6 +329,11 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     void fetchLead(leadId, controller.signal)
       .then((detail) => {
         if (controller.signal.aborted) return;
+        if (isLeadNotAppropriate(detail)) {
+          setError("Not appropriate leads cannot be edited");
+          onClose();
+          return;
+        }
         setForm(formFromDetail(detail));
       })
       .catch((err: unknown) => {
@@ -340,7 +346,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
       });
 
     return () => controller.abort();
-  }, [open, leadId]);
+  }, [open, leadId, onClose]);
 
   useEffect(() => {
     if (!present) return;

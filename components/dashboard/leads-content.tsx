@@ -38,6 +38,7 @@ import {
   type LeadColumnId,
 } from "@/lib/leads-columns";
 import type { LeadRecord } from "@/lib/leads-data";
+import { isLeadNotAppropriate } from "@/lib/leads-data";
 import {
   formatDateTimeShort,
   formatDurationMinutes,
@@ -220,7 +221,7 @@ function ColumnCell({
             leadId={lead.id}
             statusRaw={lead.statusRaw}
             statusLabel={lead.status}
-            editable={qualificationEditable}
+            editable={qualificationEditable && !isLeadNotAppropriate(lead)}
           />
         </td>
       );
@@ -840,11 +841,25 @@ function SelectionBar({
     [items, selectedById],
   );
   const assignBlocked = selectedLeads.some(
-    (lead) => !isAssignableQualification(lead.statusRaw),
+    (lead) =>
+      !isAssignableQualification(lead.statusRaw) || isLeadNotAppropriate(lead),
   );
-  const assignBlockedReason = assignBlocked
-    ? "Only Qualified / Qualified - Chat / Qualified - Call leads can be assigned"
-    : undefined;
+  const assignBlockedReason = selectedLeads.some((lead) =>
+    isLeadNotAppropriate(lead),
+  )
+    ? "Not appropriate leads cannot be assigned"
+    : assignBlocked
+      ? "Only Qualified / Qualified - Chat / Qualified - Call leads can be assigned"
+      : undefined;
+  const selectedIsNotAppropriate =
+    selectedCount === 1 &&
+    selectedLeads.some((lead) => isLeadNotAppropriate(lead));
+  const editBlocked = selectedCount !== 1 || selectedIsNotAppropriate;
+  const editBlockedReason = selectedIsNotAppropriate
+    ? "Not appropriate leads cannot be edited"
+    : selectedCount !== 1
+      ? "Select one lead to edit"
+      : "Edit selected lead";
 
   useEffect(() => {
     if (!open) {
@@ -928,18 +943,14 @@ function SelectionBar({
           {allowProfileEdit ? (
             <button
               type="button"
-              disabled={selectedCount !== 1}
-              title={
-                selectedCount !== 1
-                  ? "Select one lead to edit"
-                  : "Edit selected lead"
-              }
+              disabled={editBlocked}
+              title={editBlockedReason}
               onClick={() => {
-                if (leadIds.length !== 1) return;
+                if (leadIds.length !== 1 || selectedIsNotAppropriate) return;
                 setAssignOpen(false);
                 onEditLead(leadIds[0]);
               }}
-              className="lf-pressable rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-white/90 hover:bg-white/10 disabled:text-white/35 disabled:hover:bg-transparent"
+              className="lf-pressable rounded-xl px-2.5 py-1.5 text-[12px] font-medium text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/35 disabled:hover:bg-transparent"
             >
               Edit Info
             </button>
@@ -1163,6 +1174,8 @@ export function LeadsContent() {
 
   const openEditLead = useCallback(
     (leadId: string) => {
+      const lead = useLeadsStore.getState().items.find((row) => row.id === leadId);
+      if (isLeadNotAppropriate(lead)) return;
       closeLeadPreview();
       setEditingLeadId(leadId);
       setLeadFormOpen(true);

@@ -23,6 +23,7 @@ import {
   formatLeadAddedAt,
 } from "@/lib/datetime";
 import { leadDetailToListPatch } from "@/lib/lead-record-map";
+import { isLeadNotAppropriate } from "@/lib/leads-data";
 import {
   canEditLeadProfile,
   canMarkNotAppropriate,
@@ -253,10 +254,7 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
     detail?.fullName?.trim() ||
     listLead?.leadLabel?.trim() ||
     "Lead details";
-  const isNotAppropriate =
-    Boolean(detail?.notAppropriate) ||
-    Boolean(listLead?.notAppropriate) ||
-    listLead?.tag === "Not appropriate";
+  const isNotAppropriate = isLeadNotAppropriate(detail) || isLeadNotAppropriate(listLead);
   const notAppropriateReason =
     detail?.notAppropriateReason?.trim() ||
     "";
@@ -663,7 +661,7 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                 />
               </section>
 
-              {seMode && allowSalesOutcome ? (
+              {seMode && allowSalesOutcome && !isNotAppropriate ? (
                 <div className="border-t border-[rgba(33,37,41,0.05)] pt-4">
                   <SeOutcomeForm
                     leadId={renderedId}
@@ -773,11 +771,20 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
               >
                 Close
               </button>
-              {allowProfileEdit ? (
+              {allowProfileEdit && !isNotAppropriate ? (
                 <button
                   type="button"
                   onClick={() => onEdit(renderedId)}
                   className="lf-pressable h-9 flex-1 rounded-lg bg-[#212529] text-[12px] font-medium text-white hover:opacity-90"
+                >
+                  Edit info
+                </button>
+              ) : allowProfileEdit && isNotAppropriate ? (
+                <button
+                  type="button"
+                  disabled
+                  title="Not appropriate leads cannot be edited"
+                  className="lf-pressable h-9 flex-1 cursor-not-allowed rounded-lg bg-[#212529] text-[12px] font-medium text-white opacity-40"
                 >
                   Edit info
                 </button>
