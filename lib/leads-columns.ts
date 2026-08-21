@@ -13,6 +13,7 @@ export type LeadColumnId =
   | "score"
   | "stage"
   | "closed"
+  | "closedDate"
   | "ip"
   | "executiveNotes"
   | "added"
@@ -44,7 +45,8 @@ export const LEAD_COLUMNS: LeadColumnDef[] = [
   { id: "status", label: "Qualification", width: "168px" },
   { id: "score", label: "Score", width: "80px" },
   { id: "stage", label: "Sales Status", width: "140px" },
-  { id: "closed", label: "Closed", width: "150px" },
+  { id: "closed", label: "Closed", width: "100px" },
+  { id: "closedDate", label: "Closed date", width: "150px" },
   { id: "ip", label: "IP", width: "110px" },
   { id: "executiveNotes", label: "Executive Notes", width: "200px" },
   { id: "added", label: "Added", width: "140px" },
@@ -72,6 +74,7 @@ export const DEFAULT_VISIBLE_COLUMNS: Record<LeadColumnId, boolean> = {
   score: true,
   stage: true,
   closed: true,
+  closedDate: true,
   ip: true,
   executiveNotes: true,
   added: true,

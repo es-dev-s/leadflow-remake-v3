@@ -133,6 +133,14 @@ export function formatDurationMinutes(minutes: number | null | undefined): strin
   return `${h}h ${m}m`;
 }
 
+/** Prefer ISO closedAt; em dash when the lead is still open. */
+export function formatLeadClosedAt(
+  closedAt: string | null | undefined,
+): string {
+  if (!closedAt?.trim() || closedAt === "—") return "—";
+  return formatDateTimeShort(closedAt);
+}
+
 /** Prefer ISO raw instant when present; fall back to display string. */
 export function formatLeadAddedAt(
   createdAt: string | null | undefined,

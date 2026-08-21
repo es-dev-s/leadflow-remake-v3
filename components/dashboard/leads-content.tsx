@@ -32,7 +32,7 @@ import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { LeadPreviewSidebar } from "@/components/dashboard/lead-preview-sidebar";
 import { QualificationBadgeSelect } from "@/components/dashboard/qualification-badge-select";
 import { useActionPhase } from "@/hooks/use-action-phase";
-import { isAssignableQualification } from "@/lib/lead-form-options";
+import { isAssignableQualification, assignableQualificationHint } from "@/lib/lead-form-options";
 import {
   LEAD_COLUMNS,
   type LeadColumnId,
@@ -40,9 +40,9 @@ import {
 import type { LeadRecord } from "@/lib/leads-data";
 import { isLeadNotAppropriate } from "@/lib/leads-data";
 import {
-  formatDateTimeShort,
   formatDurationMinutes,
   formatLeadAddedAt,
+  formatLeadClosedAt,
 } from "@/lib/datetime";
 import { HighlightPhone, HighlightText } from "@/lib/highlight-match";
 import { ApiError, deleteLeads, exportLeadsPdf, fetchLead } from "@/lib/api";
@@ -240,30 +240,39 @@ function ColumnCell({
         </td>
       );
     case "closed": {
-      const closedWhen = lead.closedAt
-        ? formatDateTimeShort(lead.closedAt)
-        : lead.closed === "Closed"
-          ? "Closed"
-          : "—";
+      const outcome = lead.closed?.trim() || (lead.closedAt ? "Closed" : "Open");
+      return (
+        <td className="min-w-0 overflow-hidden px-3 py-3 align-middle text-[13px] text-[#495057]">
+          <p className="truncate" title={outcome}>
+            <HighlightText text={outcome} query={searchQuery} />
+          </p>
+        </td>
+      );
+    }
+    case "closedDate": {
+      const closedWhen = formatLeadClosedAt(lead.closedAt);
       const closeAge =
-        lead.timeToCloseMinutes != null
+        lead.closedAt && lead.timeToCloseMinutes != null
           ? formatDurationMinutes(lead.timeToCloseMinutes)
           : "";
-      const closedTitle = closeAge
-        ? `${closedWhen} · ${closeAge} to close`
-        : closedWhen;
+      const closedTitle =
+        closedWhen === "—"
+          ? "Not closed"
+          : closeAge
+            ? `${closedWhen} · ${closeAge} to close`
+            : closedWhen;
       return (
         <td className="min-w-0 overflow-hidden px-3 py-3 align-middle text-[13px] text-[#495057]">
           <p className="truncate" title={closedTitle}>
-            {lead.closedAt ? (
+            {closedWhen === "—" ? (
+              <span className="text-[#adb5bd]">—</span>
+            ) : (
               <>
                 <HighlightText text={closedWhen} query={searchQuery} />
                 {closeAge ? (
                   <span className="text-[#adb5bd]"> · {closeAge}</span>
                 ) : null}
               </>
-            ) : (
-              <HighlightText text={closedWhen} query={searchQuery} />
             )}
           </p>
         </td>
@@ -842,14 +851,15 @@ function SelectionBar({
   );
   const assignBlocked = selectedLeads.some(
     (lead) =>
-      !isAssignableQualification(lead.statusRaw) || isLeadNotAppropriate(lead),
+      !isAssignableQualification(lead.statusRaw || lead.status) ||
+      isLeadNotAppropriate(lead),
   );
   const assignBlockedReason = selectedLeads.some((lead) =>
     isLeadNotAppropriate(lead),
   )
     ? "Not appropriate leads cannot be assigned"
     : assignBlocked
-      ? "Only Qualified / Qualified - Chat / Qualified - Call leads can be assigned"
+      ? assignableQualificationHint()
       : undefined;
   const selectedIsNotAppropriate =
     selectedCount === 1 &&

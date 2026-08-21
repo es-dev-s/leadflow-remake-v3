@@ -21,6 +21,7 @@ import {
   formatDateTime,
   formatDurationMinutes,
   formatLeadAddedAt,
+  formatLeadClosedAt,
 } from "@/lib/datetime";
 import { leadDetailToListPatch } from "@/lib/lead-record-map";
 import { isLeadNotAppropriate } from "@/lib/leads-data";
@@ -122,6 +123,84 @@ function Field({
   );
 }
 
+function closedOutcomeLabel(
+  stage: string | null | undefined,
+  closed: string | null | undefined,
+) {
+  const raw = (stage ?? "").trim();
+  if (raw === "CLOSED_LOST" || closed === "Lost") return "Lost";
+  if (raw === "CLOSED_WON" || closed === "Closed") return "Closed";
+  if (closed?.trim()) return closed.trim();
+  return "Closed";
+}
+
+function ClosedLeadCard({
+  closedAt,
+  stage,
+  closed,
+  timeToCloseMinutes,
+  dealValue,
+  initialPayment,
+}: {
+  closedAt?: string | null;
+  stage?: string | null;
+  closed?: string | null;
+  timeToCloseMinutes?: number | null;
+  dealValue?: string | null;
+  initialPayment?: string | null;
+}) {
+  const outcome = closedOutcomeLabel(stage, closed);
+  const lost = outcome === "Lost";
+  const when = formatDateTime(closedAt) || formatLeadClosedAt(closedAt);
+  const duration = formatDurationMinutes(timeToCloseMinutes);
+
+  return (
+    <section
+      role="status"
+      className={[
+        "rounded-xl border px-3.5 py-3.5",
+        lost
+          ? "border-[rgba(33,37,41,0.08)] bg-[#f8f9fa]"
+          : "border-[rgba(47,158,68,0.16)] bg-[#f8fff9]",
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p
+            className={[
+              "text-[11px] font-semibold tracking-[0.06em] uppercase",
+              lost ? "text-[#495057]" : "text-[#2b8a3e]",
+            ].join(" ")}
+          >
+            {outcome}
+          </p>
+          <p className="mt-1.5 text-[15px] leading-snug font-medium tracking-[-0.02em] text-[#212529] tabular-nums">
+            {when && when !== "—" ? when : "Date not recorded"}
+          </p>
+        </div>
+        {duration !== "—" ? (
+          <p className="shrink-0 text-right text-[11px] tabular-nums text-[#868e96]">
+            {duration}
+            <span className="mt-0.5 block text-[10px] tracking-[0.04em] uppercase">
+              to close
+            </span>
+          </p>
+        ) : null}
+      </div>
+      {(dealValue && dealValue !== "—") || (initialPayment && initialPayment !== "—") ? (
+        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-[rgba(33,37,41,0.06)] pt-3">
+          {dealValue && dealValue !== "—" ? (
+            <Field label="Deal value" value={dealValue} />
+          ) : null}
+          {initialPayment && initialPayment !== "—" ? (
+            <Field label="Initial payment" value={initialPayment} />
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function LeadPreviewSidebar({ onEdit }: Props) {
   const previewLeadId = useUiStore((s) => s.previewLeadId);
   const closeLeadPreview = useUiStore((s) => s.closeLeadPreview);
@@ -149,6 +228,27 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
     renderedId != null
       ? (leadItems.find((lead) => lead.id === renderedId) ?? null)
       : null;
+  const closedAt = detail?.closedAt || listLead?.closedAt || null;
+  const closedStage = detail?.salesStage || listLead?.stageRaw || "";
+  const closedOutcome = closedOutcomeLabel(
+    closedStage,
+    detail?.closed || listLead?.closed,
+  );
+  const isSettled =
+    Boolean(closedAt) ||
+    closedStage === "CLOSED_WON" ||
+    closedStage === "CLOSED_LOST" ||
+    closedOutcome === "Closed" ||
+    closedOutcome === "Lost";
+  const dealValue =
+    detail?.dealValueDisplay ||
+    (detail?.dealValue != null
+      ? `${detail.dealCurrency || "AUD"} ${detail.dealValue}`
+      : listLead?.dealValue);
+  const initialPayment =
+    detail?.initialPayment != null
+      ? `${detail.dealCurrency || "AUD"} ${detail.initialPayment}`
+      : listLead?.ip;
 
   const resetReasonForm = () => {
     setReasonOpen(false);
@@ -477,6 +577,18 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                 </div>
               </section>
 
+              {isSettled ? (
+                <ClosedLeadCard
+                  closedAt={closedAt}
+                  stage={closedStage}
+                  closed={detail?.closed || listLead?.closed}
+                  timeToCloseMinutes={
+                    detail?.timeToCloseMinutes ?? listLead?.timeToCloseMinutes
+                  }
+                  dealValue={dealValue}
+                  initialPayment={initialPayment}
+                />
+              ) : null}
               <section className="space-y-3 border-t border-[rgba(33,37,41,0.05)] pt-4">
                 <p className="text-[11px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase">
                   Pipeline
@@ -492,44 +604,19 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                     label="Sales executive"
                     value={listLead?.salesExecutive}
                   />
-                  <Field
-                    label="Initial payment"
-                    value={
-                      detail?.initialPayment != null
-                        ? `${detail.dealCurrency || "AUD"} ${detail.initialPayment}`
-                        : listLead?.ip
-                    }
-                  />
-                  <Field
-                    label="Deal value"
-                    value={
-                      detail?.dealValueDisplay ||
-                      (detail?.dealValue != null
-                        ? `${detail.dealCurrency || "AUD"} ${detail.dealValue}`
-                        : listLead?.dealValue)
-                    }
-                  />
-                  {detail?.closedAt || listLead?.closedAt ? (
+                  {!isSettled ? (
                     <>
-                      <Field label="Closed" value="Closed" />
+                      <Field label="Initial payment" value={initialPayment} />
+                      <Field label="Deal value" value={dealValue} />
                       <Field
-                        label="Closed at"
-                        value={formatDateTimeLabel(
-                          detail?.closedAt || listLead?.closedAt,
-                        )}
-                      />
-                      <Field
-                        label="Time to close"
-                        value={formatDurationMinutes(
-                          detail?.timeToCloseMinutes ??
-                            listLead?.timeToCloseMinutes,
-                        )}
+                        label="Closed"
+                        value={detail?.closed || listLead?.closed || "Open"}
                       />
                     </>
                   ) : (
                     <Field
-                      label="Closed"
-                      value={detail?.closed || listLead?.closed || "Open"}
+                      label="Closed date"
+                      value={formatLeadClosedAt(closedAt)}
                     />
                   )}
                 </div>

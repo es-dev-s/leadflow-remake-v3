@@ -64,13 +64,45 @@ const ASSIGNABLE_QUALIFICATIONS = new Set<string>([
   "ORGANIC",
 ]);
 
+function compactQualificationKey(status: string) {
+  return status
+    .trim()
+    .toUpperCase()
+    .replace(/[-\s]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+/** Canonical code (PAID / ORGANIC / QUALIFIED_CHAT / …) or the trimmed input. */
+export function normalizeQualification(
+  status: string | null | undefined,
+): string {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "";
+  if (ASSIGNABLE_QUALIFICATIONS.has(raw) || QUALIFICATION_OPTIONS.some((o) => o.value === raw)) {
+    return raw;
+  }
+  const compact = compactQualificationKey(raw);
+  const byValue = QUALIFICATION_OPTIONS.find((option) => option.value === compact);
+  if (byValue) return byValue.value;
+  const byLabel = QUALIFICATION_OPTIONS.find(
+    (option) => option.label.toLowerCase() === raw.toLowerCase(),
+  );
+  return byLabel?.value ?? raw;
+}
+
 export function isAssignableQualification(status: string | null | undefined) {
-  return ASSIGNABLE_QUALIFICATIONS.has(String(status ?? "").trim());
+  return ASSIGNABLE_QUALIFICATIONS.has(normalizeQualification(status));
+}
+
+export function assignableQualificationHint() {
+  return "Only qualified leads can be assigned (Qualified, Chat, Call, Paid, Organic)";
 }
 
 export function qualificationLabel(status: string | null | undefined) {
-  const match = QUALIFICATION_OPTIONS.find((option) => option.value === status);
-  return match?.label ?? (status ? status.replace(/_/g, " ") : "—");
+  const code = normalizeQualification(status);
+  const match = QUALIFICATION_OPTIONS.find((option) => option.value === code);
+  return match?.label ?? (status ? String(status).replace(/_/g, " ") : "—");
 }
 
 export type CreateLeadPayload = {

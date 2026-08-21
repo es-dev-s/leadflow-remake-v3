@@ -616,6 +616,7 @@ export const useLeadsStore = create<LeadsState>()(
             score: true,
             stage: true,
             closed: false,
+            closedDate: false,
             ip: false,
             executiveNotes: false,
             added: true,
