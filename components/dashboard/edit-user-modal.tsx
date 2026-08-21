@@ -11,6 +11,7 @@ import {
 import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
   creatableRoleOptions,
+  isAnalystTeamLead,
   isLeadAnalyst,
   roleDisplayLabel,
   roleNeedsSalesTeam,
@@ -106,9 +107,15 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
 
   if (!mounted || !open || !user) return null;
 
+  const lockAnalystTeam =
+    isAnalystTeamLead(actorRole) && isLeadAnalyst(role);
   const showAnalystTeam =
-    role === Role.AnalystTeamLead || isLeadAnalyst(role);
+    (role === Role.AnalystTeamLead || isLeadAnalyst(role)) && !lockAnalystTeam;
   const showSalesTeam = roleNeedsSalesTeam(role);
+  const lockedAnalystTeamLabel =
+    actor?.analystTeamName?.trim() ||
+    user.analystTeamName?.trim() ||
+    "No team";
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -187,6 +194,15 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
               </p>
               <p className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-2.5 text-[13px] text-[#212529]">
                 {user.teamName?.trim() || "No team"}
+              </p>
+            </div>
+          ) : lockAnalystTeam ? (
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
+                Team
+              </p>
+              <p className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-2.5 text-[13px] text-[#212529]">
+                {lockedAnalystTeamLabel}
               </p>
             </div>
           ) : null}

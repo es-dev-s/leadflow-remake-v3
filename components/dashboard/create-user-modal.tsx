@@ -444,6 +444,11 @@ export function CreateUserModal({
               This sales executive will be assigned to your team
               {actor?.teamName ? ` (${actor.teamName})` : ""}.
             </p>
+          ) : inheritAnalystTeam ? (
+            <p className="text-[11px] text-[#adb5bd]">
+              This Lead Analyst will be assigned to your team
+              {actorAnalystTeam ? ` (${actorAnalystTeam})` : ""}.
+            </p>
           ) : null}
 
           {error ? (
