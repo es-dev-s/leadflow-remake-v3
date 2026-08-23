@@ -1,7 +1,6 @@
 "use client";
 
 import { ActionButton } from "@/components/dashboard/action-button";
-import { BackendStatusIndicator } from "@/components/dashboard/backend-status";
 import {
   fetchNotifications,
   markNotificationsRead,
@@ -300,8 +299,6 @@ export function Navbar() {
         </h1>
 
         <div className="relative flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
-          <BackendStatusIndicator />
-
           {showLeadTools ? (
             <>
           {showFilters ? (
