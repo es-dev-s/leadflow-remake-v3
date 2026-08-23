@@ -11,6 +11,7 @@ export type RealtimeEvent = {
   role?: string;
   users?: Array<{ userId: string; teamId?: string; role?: string }>;
   actorId?: string;
+  sessionId?: string;
   at?: number;
 };
 
@@ -82,7 +83,6 @@ class RealtimeClient {
     const marker = `${getAuthToken() ?? ""}:${getSessionId() ?? ""}`;
     this.sessionMarker = marker;
     if (!getAuthToken()) {
-      this.scheduleReconnect(2000);
       return;
     }
 
@@ -121,9 +121,8 @@ class RealtimeClient {
       }
       if (!parsed || !parsed.type) return;
       if (parsed.type === "auth.session_replaced") {
-        const live = getLiveSession();
         const mine = getSessionId();
-        if (live && mine && live.sessionId === mine) {
+        if (parsed.sessionId && mine && parsed.sessionId === mine) {
           return;
         }
         this.emitSessionReplaced();

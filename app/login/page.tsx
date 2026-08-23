@@ -2,6 +2,7 @@
 
 import { ApiError, hydrateBrowserSession, loginRequest } from "@/lib/api";
 import { COOKIE_SESSION, clearAuthToken, getAuthToken } from "@/lib/auth-token";
+import { beginAuthTransition, endAuthTransition } from "@/lib/session-lock";
 import { isAbortError } from "@/lib/reset-client-state";
 import { useAuthStore } from "@/store/auth-store";
 import { Eye, EyeOff } from "lucide-react";
@@ -74,6 +75,7 @@ function LoginForm() {
 
     bootstrapAbortRef.current?.abort();
     bootstrapAbortRef.current = null;
+    beginAuthTransition();
 
     try {
       const result = await loginRequest(cleanEmail, cleanPassword);
@@ -88,6 +90,8 @@ function LoginForm() {
         setError(err instanceof Error ? err.message : "Login failed");
       }
       setSubmitting(false);
+    } finally {
+      endAuthTransition();
     }
   }
 

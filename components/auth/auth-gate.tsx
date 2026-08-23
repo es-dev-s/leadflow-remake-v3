@@ -14,7 +14,11 @@ import { COOKIE_SESSION, getAuthToken, getSessionId } from "@/lib/auth-token";
 import { readCachedUser, writeCachedUser } from "@/lib/auth-user-cache";
 import { isAbortError } from "@/lib/reset-client-state";
 import { subscribeRealtime } from "@/lib/realtime";
-import { subscribeSessionLock } from "@/lib/session-lock";
+import {
+  consumeSessionKick,
+  isAuthTransitioning,
+  subscribeSessionLock,
+} from "@/lib/session-lock";
 import { useAuthStore } from "@/store/auth-store";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -87,7 +91,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
         markBootstrapped();
         writeCachedUser(null);
-        clearSession({ server: sessionTaken ? false : undefined });
+        clearSession();
         router.replace(
           apiErr && isInactiveAccountError(apiErr.status, apiErr.message)
             ? "/login?reason=inactive"
@@ -119,8 +123,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     if (!ready || !user?.id) return;
 
     const kickForSession = () => {
+      if (!consumeSessionKick()) return;
       writeCachedUser(null);
-      clearSession({ server: false });
+      clearSession();
       router.replace("/login?reason=session");
     };
 
@@ -167,9 +172,49 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     });
 
     const unsubLock = subscribeSessionLock(user.id, kickForSession);
+
+    const probeSession = () => {
+      if (isAuthTransitioning()) return;
+      void fetchMe()
+        .then((me) => {
+          if (me.isActive === false) {
+            writeCachedUser(null);
+            clearSession();
+            router.replace("/login?reason=inactive");
+            return;
+          }
+          setUser(me);
+        })
+        .catch((err: unknown) => {
+          const apiErr = err instanceof ApiError ? err : null;
+          if (
+            apiErr != null &&
+            isSessionReplacedError(apiErr.status, apiErr.message)
+          ) {
+            kickForSession();
+            return;
+          }
+          if (apiErr?.status === 401) {
+            writeCachedUser(null);
+            clearSession();
+            router.replace("/login");
+          }
+        });
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") probeSession();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", probeSession);
+    const tick = window.setInterval(probeSession, 20000);
+
     return () => {
       unsubRealtime();
       unsubLock();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", probeSession);
+      window.clearInterval(tick);
     };
   }, [ready, user?.id, clearSession, router, setUser]);
 

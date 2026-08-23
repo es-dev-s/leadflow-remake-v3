@@ -9,10 +9,15 @@ import {
   setSessionId,
   setSessionUserId,
   clearSessionId,
+  getSessionId,
 } from "@/lib/auth-token";
 import { resetClientState } from "@/lib/reset-client-state";
 import { writeCachedUser } from "@/lib/auth-user-cache";
-import { announceSession } from "@/lib/session-lock";
+import {
+  announceSession,
+  bumpAuthEpoch,
+  noteAuthWrite,
+} from "@/lib/session-lock";
 import { realtime } from "@/lib/realtime";
 import type { PublicUser } from "@/lib/api";
 import {
@@ -45,6 +50,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   setSession: (_token, expiresAt, user, sessionId) => {
     const prevUserId = get().user?.id;
+    noteAuthWrite();
     setAuthToken(COOKIE_SESSION, expiresAt);
     if (sessionId?.trim()) {
       setSessionId(sessionId.trim());
@@ -66,18 +72,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   clearSession: (opts) => {
     const server = opts?.server !== false;
-    clearAuthToken();
-    if (server) clearSessionId();
-    writeCachedUser(null);
-    resetClientState();
-    set({ token: null, user: null, bootstrapped: true });
+    const sid = getSessionId();
+    bumpAuthEpoch();
     if (server) {
       void import("@/lib/api")
-        .then((m) => m.logoutRequest())
+        .then((m) => m.logoutRequest(sid))
         .catch(() => {
           /* ignore */
         });
     }
+    clearAuthToken();
+    clearSessionId();
+    writeCachedUser(null);
+    resetClientState();
+    set({ token: null, user: null, bootstrapped: true });
     realtime.refreshAuth();
   },
 

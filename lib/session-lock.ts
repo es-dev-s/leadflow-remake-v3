@@ -128,6 +128,52 @@ export function subscribeSessionLock(
   };
 }
 
+let authEpoch = 0;
+let authTransitioning = 0;
+let logoutAbort: AbortController | null = null;
+let consumedKickEpoch = -1;
+
+/** Call around login / claim so an older kick cannot abort the new session. */
+export function beginAuthTransition() {
+  authEpoch += 1;
+  authTransitioning += 1;
+  logoutAbort?.abort();
+  logoutAbort = null;
+}
+
+export function endAuthTransition() {
+  authTransitioning = Math.max(0, authTransitioning - 1);
+}
+
+export function isAuthTransitioning() {
+  return authTransitioning > 0;
+}
+
+export function nextLogoutSignal(): AbortSignal | undefined {
+  logoutAbort?.abort();
+  logoutAbort = new AbortController();
+  return logoutAbort.signal;
+}
+
+export function bumpAuthEpoch() {
+  authEpoch += 1;
+}
+
+/** A local session write — abort any in-flight logout so it cannot land later. */
+export function noteAuthWrite() {
+  authEpoch += 1;
+  logoutAbort?.abort();
+  logoutAbort = null;
+}
+
+/** True once per epoch — duplicate SSE / probe / lock kicks collapse. */
+export function consumeSessionKick(): boolean {
+  if (authTransitioning > 0) return false;
+  if (consumedKickEpoch === authEpoch) return false;
+  consumedKickEpoch = authEpoch;
+  return true;
+}
+
 export function liveSessionReplacedThisTab(): boolean {
   const live = getLiveSession();
   const mineSid = getSessionId();

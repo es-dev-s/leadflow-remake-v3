@@ -52,23 +52,16 @@ export function isSessionReplacedError(
   return (message ?? "").toLowerCase().includes("signed in elsewhere");
 }
 
+export function resetUnauthorizedGuard() {
+  handlingUnauthorized = false;
+}
+
 function redirectToLogin(reason?: "inactive" | "session") {
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith("/login")) return;
   if (handlingUnauthorized) return;
   handlingUnauthorized = true;
   clearAuthToken();
-  // Stale tabs share the HttpOnly cookie with the newer login. Do not clear
-  // that cookie or the live server session from this tab.
-  if (reason !== "session") {
-    void fetch(`${BACKEND_URL}/api/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-    }).catch(() => {
-      /* ignore */
-    });
-  }
   void import("@/lib/reset-client-state")
     .then((m) => m.resetClientState())
     .catch(() => {
@@ -1307,18 +1300,27 @@ export async function loginRequest(
   if (!res.ok) {
     throw await readApiError(res, "Login failed");
   }
+  resetUnauthorizedGuard();
   return (await res.json()) as AuthResponse;
 }
 
-export async function logoutRequest(): Promise<void> {
+export async function logoutRequest(
+  sessionId?: string | null,
+): Promise<void> {
   try {
+    const sid = (sessionId ?? getSessionId() ?? "").trim();
+    const headers = new Headers();
+    if (sid) headers.set(SESSION_HEADER, sid);
+    const { nextLogoutSignal } = await import("@/lib/session-lock");
     await apiFetch("/api/auth/logout", {
       method: "POST",
       auth: false,
       skipAuthRedirect: true,
+      headers,
+      signal: nextLogoutSignal(),
     });
   } catch {
-    /* cookie clear is best-effort */
+    /* cookie clear is best-effort; abort is expected on a newer login */
   }
 }
 
@@ -1346,6 +1348,7 @@ export async function claimSessionRequest(
   if (!res.ok) {
     throw await readApiError(res, "Session expired");
   }
+  resetUnauthorizedGuard();
   return (await res.json()) as AuthResponse;
 }
 
@@ -1361,11 +1364,19 @@ export async function hydrateBrowserSession(
   if (existing) {
     return { user, sessionId: existing };
   }
-  const claimed = await claimSessionRequest(signal);
-  return {
-    user: claimed.user ?? user,
-    sessionId: claimed.sessionId,
-  };
+  const { beginAuthTransition, endAuthTransition } = await import(
+    "@/lib/session-lock"
+  );
+  beginAuthTransition();
+  try {
+    const claimed = await claimSessionRequest(signal);
+    return {
+      user: claimed.user ?? user,
+      sessionId: claimed.sessionId,
+    };
+  } finally {
+    endAuthTransition();
+  }
 }
 
 export async function fetchRoles(
