@@ -50,6 +50,13 @@ body {
   color: #212529;
 }
 
+/* Drag-selecting label text on black buttons must stay white. */
+.bg-\[\#212529\]::selection,
+.bg-\[\#212529\] *::selection {
+  background: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
