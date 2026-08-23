@@ -45,6 +45,34 @@ const PARAM_KEYS = [
   "field",
 ] as const;
 
+function isPresetFilter(filter?: string) {
+  const value = filter?.trim();
+  return Boolean(value && value !== "all");
+}
+
+/**
+ * Combine dashboard scope with a card/chart click.
+ * Empty overlay keys and filter=all do not wipe country/dates/source/etc.
+ */
+export function mergeLeadDeepLink(
+  base: LeadsDeepLink,
+  overlay: LeadsDeepLink,
+): LeadsDeepLink {
+  const merged: LeadsDeepLink = { ...base };
+  for (const key of PARAM_KEYS) {
+    const value = overlay[key];
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    if (key === "filter" && trimmed === "all") continue;
+    merged[key] = trimmed;
+  }
+  if (isPresetFilter(overlay.filter)) {
+    merged.filter = overlay.filter!.trim();
+  }
+  return merged;
+}
+
 export function buildLeadsHref(link: LeadsDeepLink): string {
   const sp = new URLSearchParams();
   for (const key of PARAM_KEYS) {

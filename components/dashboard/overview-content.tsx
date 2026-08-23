@@ -150,26 +150,6 @@ export function OverviewContent() {
     );
   }
 
-  const open = (link: LeadsDeepLink) => {
-    // KPIs now use the same facet scope as the leads list.
-    const base = toDashboardDeepLink(filters);
-    const merged: LeadsDeepLink = { ...base, ...link };
-    // Card facet must not fight leftover status/stage/preset from the dashboard.
-    if (link.filter) {
-      merged.status = undefined;
-      merged.stage = undefined;
-    }
-    if (link.stage) {
-      merged.filter = undefined;
-      merged.status = undefined;
-    }
-    if (link.status) {
-      merged.filter = undefined;
-      merged.stage = undefined;
-    }
-    navigateToLeads(merged);
-  };
-
   const withTeamLeads = summary?.withTeamLeads ?? 0;
   const withSalesExecs = summary?.withSalesExecs ?? 0;
   const passedSeTlTotal = withTeamLeads + withSalesExecs;
@@ -184,6 +164,7 @@ export function OverviewContent() {
       ? `With team lead ${formatCount(withTeamLeads)} · With executive ${formatCount(withSalesExecs)}`
       : undefined;
 
+  const scope = toDashboardDeepLink(filters);
   const primary: Array<{
     label: string;
     value: string;
@@ -203,33 +184,33 @@ export function OverviewContent() {
     {
       label: "Total leads",
       value: formatCount(summary?.leadsTotal),
-      link: { filter: "all" },
+      link: { ...scope },
     },
     {
       label: "Irrelevant",
       value: formatCount(summary?.irrelevantLeads),
-      link: { filter: "irrelevant" },
+      link: { ...scope, filter: "irrelevant" },
     },
     {
       label: "Qualified",
       value: formatCount(summary?.qualifiedLeads),
-      link: { filter: "qualified" },
+      link: { ...scope, filter: "qualified" },
     },
     {
       label: "Not qualified",
       value: formatCount(summary?.notQualifiedLeads),
-      link: { filter: "new" },
+      link: { ...scope, filter: "new" },
     },
     {
       label: passedLabel,
       value: formatCount(summary ? passedSeTlTotal : undefined),
       detail: passedDetail,
-      link: { filter: "passed-se-tl" },
+      link: { ...scope, filter: "passed-se-tl" },
     },
     {
       label: "Total lost",
       value: formatCount(summary?.totalLost),
-      link: { filter: "lost" },
+      link: { ...scope, filter: "lost" },
     },
   ];
 
@@ -305,7 +286,7 @@ export function OverviewContent() {
               compact
               onClick={
                 card.link
-                  ? () => open(card.link!)
+                  ? () => navigateToLeads(card.link!)
                   : card.href
                     ? () => router.push(card.href!)
                     : undefined
@@ -325,7 +306,7 @@ export function OverviewContent() {
               label={card.label}
               value={card.value}
               detail={card.detail}
-              onClick={() => open(card.link)}
+              onClick={() => navigateToLeads(card.link)}
             />
           ))}
         </div>

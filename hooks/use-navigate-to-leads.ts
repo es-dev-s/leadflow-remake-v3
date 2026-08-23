@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import {
   buildLeadsHref,
+  mergeLeadDeepLink,
   type LeadsDeepLink,
 } from "@/lib/leads-href";
 import { useOverviewScrollStore } from "@/store/overview-scroll-store";
@@ -11,6 +12,7 @@ import {
   toDashboardDeepLink,
   useDashboardFilterStore,
 } from "@/store/dashboard-filter-store";
+import { useLeadsStore } from "@/store/leads-store";
 
 export const OVERVIEW_SCROLL_ATTR = "data-lf-overview-scroll";
 
@@ -27,38 +29,18 @@ export function flushOverviewScroll() {
   if (el) useOverviewScrollStore.getState().setScrollTop(el.scrollTop);
 }
 
-function mergeDashboardLeadLink(
-  base: LeadsDeepLink,
-  link: LeadsDeepLink,
-): LeadsDeepLink {
-  const merged: LeadsDeepLink = { ...base, ...link };
-  if (link.filter) {
-    merged.status = undefined;
-    merged.stage = undefined;
-  }
-  if (link.stage) {
-    merged.filter = undefined;
-    merged.status = undefined;
-  }
-  if (link.status) {
-    merged.filter = undefined;
-    merged.stage = undefined;
-  }
-  return merged;
-}
-
 /** Navigate to /leads with structured filters (dashboard click-through). */
 export function useNavigateToLeads() {
   const router = useRouter();
-  const filters = useDashboardFilterStore((s) => s.filters);
 
   return useCallback(
     (link: LeadsDeepLink) => {
       flushOverviewScroll();
-      router.push(
-        buildLeadsHref(mergeDashboardLeadLink(toDashboardDeepLink(filters), link)),
-      );
+      const filters = useDashboardFilterStore.getState().filters;
+      const merged = mergeLeadDeepLink(toDashboardDeepLink(filters), link);
+      useLeadsStore.getState().applyDeepLink(merged);
+      router.push(buildLeadsHref(merged));
     },
-    [router, filters],
+    [router],
   );
 }
