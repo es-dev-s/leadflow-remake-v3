@@ -11,8 +11,8 @@ import {
   BLANK_GEO,
   filterCityGeoOptions,
   LEAD_STAGE_OPTIONS,
-  leadPresetOptionsForRole,
   mergeExternalFilters,
+  presetLabelForRole,
   normalizeDateRange,
 } from "@/lib/lead-filter-labels";
 import {
@@ -112,7 +112,6 @@ export function DashboardFilterSidebar() {
   const teamScoped = isTeamScoped(role);
   const hideTeamFilter = teamScoped || assigneeScoped;
   const hideAnalystFilter = creatorScoped || teamScoped || assigneeScoped;
-  const presetOptions = useMemo(() => leadPresetOptionsForRole(role), [role]);
 
   const [draft, setDraft] = useState<DashboardFilters>({ ...filters });
   const [appliedFlash, setAppliedFlash] = useState(false);
@@ -295,13 +294,10 @@ export function DashboardFilterSidebar() {
     if (draft.country) parts.push(draft.country);
     if (draft.city) parts.push(draft.city);
     if (draft.filterValue !== "all") {
-      parts.push(
-        presetOptions.find((o) => o.id === draft.filterValue)?.label ??
-          draft.filterValue,
-      );
+      parts.push(presetLabelForRole(draft.filterValue, role) || draft.filterValue);
     }
     return parts;
-  }, [draft, presetOptions]);
+  }, [draft, role]);
 
   return (
     <FilterPanelShell
@@ -381,18 +377,6 @@ export function DashboardFilterSidebar() {
                   ))}
                 </SelectField>
               </div>
-
-              <SelectField
-                label="Preset"
-                value={draft.filterValue}
-                onChange={(value) => patch("filterValue", value)}
-              >
-                {presetOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </SelectField>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SelectField

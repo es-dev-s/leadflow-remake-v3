@@ -10,7 +10,6 @@ import {
   BLANK_GEO,
   filterCityGeoOptions,
   LEAD_STAGE_OPTIONS,
-  leadPresetOptionsForRole,
   mergeExternalFilters,
   normalizeDateRange,
 } from "@/lib/lead-filter-labels";
@@ -141,7 +140,6 @@ export function LeadFilterSidebar() {
   const teamScoped = isTeamScoped(role);
   const hideTeamFilter = teamScoped || assigneeScoped;
   const hideAnalystFilter = creatorScoped || teamScoped || assigneeScoped;
-  const presetOptions = useMemo(() => leadPresetOptionsForRole(role), [role]);
 
   const [draft, setDraft] = useState<Draft>(() =>
     draftFromStore(filterValue, facets),
@@ -372,28 +370,6 @@ export function LeadFilterSidebar() {
             </div>
           ) : (
             <div className="space-y-5">
-              <SelectField
-                label="Preset"
-                value={draft.filterValue}
-                onChange={(value) => {
-                  setAppliedFlash(false);
-                  setDraft((prev) => ({
-                    ...prev,
-                    filterValue: value,
-                    facets: {
-                      ...prev.facets,
-                      status: value !== "all" ? "" : prev.facets.status,
-                    },
-                  }));
-                }}
-              >
-                {presetOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </SelectField>
-
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <SelectField
                   label="Status"
