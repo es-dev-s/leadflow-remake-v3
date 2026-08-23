@@ -345,7 +345,7 @@ export function UsersContent() {
                       : "border-[rgba(47,158,68,0.22)] bg-[#ebfbee] text-[#2b8a3e]",
                   ].join(" ")}
                 >
-                  <span className="opacity-80">Active</span>
+                  <span className="opacity-80">Online</span>
                   <span className="font-medium">{formatCount(activeCount)}</span>
                 </button>
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-[rgba(33,37,41,0.1)] bg-white px-2.5 py-1 text-[11px] tabular-nums text-[#212529]">
