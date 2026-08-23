@@ -1,16 +1,9 @@
 "use client";
 
 import { ActionButton } from "@/components/dashboard/action-button";
-import {
-  ApiError,
-  fetchRoles,
-  updateUserRequest,
-  type PublicUser,
-  type RoleOption,
-} from "@/lib/api";
+import { ApiError, updateUserRequest, type PublicUser } from "@/lib/api";
 import { generateTemporaryPassword } from "@/lib/generate-password";
 import {
-  creatableRoleOptions,
   isLeadAnalyst,
   roleDisplayLabel,
   roleNeedsSalesTeam,
@@ -34,12 +27,8 @@ const inputClass =
 
 export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
   const actor = useAuthStore((s) => s.user);
-  const actorRole = actor?.role;
   const actorRoleLabel = roleDisplayLabel(actor?.role, actor?.roleLabel);
   const [mounted, setMounted] = useState(false);
-  const [roles, setRoles] = useState<RoleOption[]>(() =>
-    creatableRoleOptions(actorRole),
-  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("LEAD_ANALYST");
@@ -74,35 +63,7 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
     setError(null);
     setFieldErrors({});
     resetSubmit();
-    const scoped = creatableRoleOptions(actorRole);
-    // Keep current role visible even if somehow outside scope (read-only edge).
-    const withCurrent =
-      scoped.some((r) => r.value === user.role) || !user.roleLabel
-        ? scoped
-        : [
-            ...scoped,
-            { value: user.role, label: user.roleLabel || user.role },
-          ];
-    setRoles(withCurrent);
-    const controller = new AbortController();
-    void fetchRoles(controller.signal)
-      .then((rows) => {
-        if (controller.signal.aborted) return;
-        if (!rows.length) return;
-        const merged =
-          rows.some((r) => r.value === user.role)
-            ? rows
-            : [
-                ...rows,
-                { value: user.role, label: user.roleLabel || user.role },
-              ];
-        setRoles(merged);
-      })
-      .catch(() => {
-        /* keep scoped defaults */
-      });
-    return () => controller.abort();
-  }, [open, user, actorRole]);
+  }, [open, user, resetSubmit]);
 
   if (!mounted || !open || !user) return null;
 
@@ -284,43 +245,12 @@ export function EditUserModal({ open, user, onClose, onUpdated }: Props) {
           </div>
 
           <div>
-            <p
-              id="edit-user-role-label"
-              className="mb-2 block text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase"
-            >
+            <p className="mb-1.5 text-[11px] font-medium tracking-[0.08em] text-[#868e96] uppercase">
               Role
             </p>
-            <div
-              role="radiogroup"
-              aria-labelledby="edit-user-role-label"
-              className="grid grid-cols-1 gap-2 sm:grid-cols-2"
-            >
-              {(roles.length ? roles : creatableRoleOptions(actorRole)).map((option) => {
-                const selected = role === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={submitting}
-                    onClick={() => setRole(option.value)}
-                    className={[
-                      "lf-pressable min-h-[42px] rounded-xl border px-3 py-2.5 text-left text-[12.5px] leading-snug font-medium transition-[border-color,background-color,color,box-shadow]",
-                      selected
-                        ? "border-[rgba(232,104,18,0.45)] bg-[#fff7ef] text-[#9a3f00] shadow-[inset_0_0_0_1px_rgba(232,104,18,0.12)]"
-                        : "border-[rgba(33,37,41,0.1)] bg-[#fbfbfc] text-[#495057] hover:border-[rgba(33,37,41,0.16)] hover:bg-white hover:text-[#212529]",
-                      submitting ? "opacity-60" : "",
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-            {fieldErrors.role ? (
-              <p className="mt-1 text-[11px] text-[#c92a2a]">{fieldErrors.role}</p>
-            ) : null}
+            <p className="rounded-xl border border-[rgba(33,37,41,0.08)] bg-[#f8f9fa] px-3.5 py-2.5 text-[13px] text-[#212529]">
+              {roleDisplayLabel(user.role, user.roleLabel)}
+            </p>
           </div>
 
           {showAnalystTeam ? (
