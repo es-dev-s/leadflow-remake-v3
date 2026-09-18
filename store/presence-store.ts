@@ -29,11 +29,14 @@ function upsert(
 export function countOnline(
   byId: Record<string, PresenceUser>,
   teamId?: string | null,
+  options?: { excludeRoles?: string[] },
 ) {
   const team = teamId?.trim();
+  const exclude = new Set(options?.excludeRoles ?? []);
   let n = 0;
   for (const row of Object.values(byId)) {
     if (team && team !== "none" && (row.teamId || "") !== team) continue;
+    if (row.role && exclude.has(row.role)) continue;
     n += 1;
   }
   return n;

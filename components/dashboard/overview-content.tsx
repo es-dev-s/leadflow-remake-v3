@@ -29,6 +29,7 @@ import {
   isAssigneeScoped,
   isSuperadmin,
   isTeamScoped,
+  Role,
 } from "@/lib/roles";
 import {
   toDashboardDeepLink,
@@ -137,7 +138,13 @@ export function OverviewContent() {
   const presenceTeamId =
     filters.teamId || (teamScoped ? userTeamId : "") || undefined;
   const liveActiveUsers = usePresenceStore((s) =>
-    s.hydrated ? countOnline(s.byId, presenceTeamId) : null,
+    s.hydrated
+      ? countOnline(
+          s.byId,
+          presenceTeamId,
+          superadmin ? undefined : { excludeRoles: [Role.Superadmin] },
+        )
+      : null,
   );
 
   if (!canViewLeadData(role)) {

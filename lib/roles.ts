@@ -146,6 +146,8 @@ export function userManagementTabs(
   }
   if (isAnalystTeamLead(actorRole)) {
     return [
+      { id: "all", label: "All" },
+      { id: Role.AnalystTeamLead, label: "Analyst Team Leads" },
       { id: Role.LeadAnalyst, label: "Lead Analysts" },
       { id: Role.MainTeamLead, label: "Main Team Leads" },
       { id: Role.SalesExecutive, label: "Sales Executives" },
@@ -227,7 +229,7 @@ export function canChangeQualification(role: string | null | undefined) {
 
 /**
  * Full lead profile edit (contact, source, notes, etc.).
- * Superadmin and ATL may edit any accessible lead. Lead Analysts may edit
+ * Superadmin and ATL may edit any lead. Lead Analysts may edit
  * leads they created (list/API are already creator-scoped).
  */
 export function canEditLeadProfile(role: string | null | undefined) {
