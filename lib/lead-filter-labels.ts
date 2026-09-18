@@ -1,5 +1,9 @@
 import type { LeadsDeepLink } from "@/lib/leads-href";
-import { QUALIFICATION_OPTIONS } from "@/lib/lead-form-options";
+import {
+  QUALIFICATION_OPTIONS,
+  canonicalizePortal,
+  canonicalizeSource,
+} from "@/lib/lead-form-options";
 import type { DashboardFilters } from "@/store/dashboard-filter-store";
 import type { LeadFacets } from "@/store/leads-store";
 
@@ -213,9 +217,17 @@ export function formatFacetChips(input: {
     );
   }
   if (f.source)
-    chips.push(f.source === "none" ? "Source: Blank" : `Source: ${f.source}`);
+    chips.push(
+      f.source === "none"
+        ? "Source: Blank"
+        : `Source: ${canonicalizeSource(f.source)}`,
+    );
   if (f.portal)
-    chips.push(f.portal === "none" ? "Portal: Blank" : `Portal: ${f.portal}`);
+    chips.push(
+      f.portal === "none"
+        ? "Portal: Blank"
+        : `Portal: ${canonicalizePortal(f.portal)}`,
+    );
   if ("metaProfile" in f && f.metaProfile)
     chips.push(
       f.metaProfile === "none" ? "Meta: Blank" : `Meta: ${f.metaProfile}`,

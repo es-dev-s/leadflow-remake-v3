@@ -1,5 +1,5 @@
 import type { LeadDetail } from "@/lib/api";
-import { qualificationLabel } from "@/lib/lead-form-options";
+import { qualificationLabel, canonicalizePortal, canonicalizeSource } from "@/lib/lead-form-options";
 import { seOutcomeLabel } from "@/lib/lead-filter-labels";
 import type { LeadRecord } from "@/lib/leads-data";
 
@@ -44,8 +44,8 @@ export function leadDetailToListPatch(
           : null;
   return {
     leadLabel: detail.fullName?.trim() || "—",
-    source: dash(detail.source),
-    portal: dash(detail.portalWebsite),
+    source: dash(canonicalizeSource(detail.source)),
+    portal: dash(canonicalizePortal(detail.portalWebsite)),
     contactPhone: dash(detail.phone),
     contactEmail: dash(detail.email),
     contactLocation: formatLocation(detail.city, detail.country),

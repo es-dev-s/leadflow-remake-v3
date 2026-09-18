@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
 
   // Allow opening the dev app via LAN IP (phone / other devices).
   allowedDevOrigins: [
+    "10.110.110.69",
+    "10.110.110.69:3100",
+    "10.80.80.220",
+    "10.80.80.220:3100",
+    "10.80.80.225",
+    "10.80.80.225:3100",
     "192.168.0.129",
     "192.168.0.129:3100",
     "127.0.0.1",

@@ -4,7 +4,7 @@ export const PORTAL_WEBSITES = [
   "ACSRPL Writing",
   "Best CDR Writer",
   "CCL Hub",
-  "CDRAssessment Help",
+  "CDR Assessment Help",
   "CDR Australia Expert",
   "CDR Australia Group",
   "CDR Australia Help",
@@ -36,13 +36,125 @@ export const PORTAL_OTHER = "Other — not in list";
 
 export const LEAD_SOURCES = [
   "Meta WhatsApp",
-  "Meta Messenger",
   "Website WhatsApp",
-  "Meta Lead Form",
+  "Meta Messenger",
   "Website Download Form",
-  "G.WhatsApp(CAM/CWA/CRW)",
-  "Google LeadForm",
+  "Google Lead Form",
+  "Support WA numbers",
+  "Meta Lead Form",
 ] as const;
+
+function compactAlphaNum(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function sourceBase(raw: string) {
+  const s = raw.trim();
+  for (const sep of [" — ", " – ", " - ", "—", "–"] as const) {
+    const i = s.indexOf(sep);
+    if (i > 0) return s.slice(0, i).trim();
+  }
+  return s;
+}
+
+function portalLookupKey(raw: string) {
+  let compact = compactAlphaNum(raw)
+    .replace(/migartion/g, "migration")
+    .replace(/assesement/g, "assessment")
+    .replace(/writitng/g, "writing");
+  for (let i = 0; i < 3; i += 1) {
+    const next = compact.replace(
+      /(websitedownloadform|comau|com|support)$/g,
+      "",
+    );
+    if (next === compact) break;
+    compact = next;
+  }
+  return compact;
+}
+
+const SOURCE_BY_KEY: Record<string, string> = {
+  metawhatsapp: "Meta WhatsApp",
+  websitewhatsapp: "Website WhatsApp",
+  whatsappwebsite: "Website WhatsApp",
+  metamessenger: "Meta Messenger",
+  websitedownloadform: "Website Download Form",
+  googleleadform: "Google Lead Form",
+  gwhatsappcamcwacrw: "Support WA numbers",
+  supportwanumbers: "Support WA numbers",
+  supportwa: "Support WA numbers",
+  metaleadform: "Meta Lead Form",
+};
+
+const PORTAL_BY_KEY: Record<string, string> = {
+  cdraustraliamigartion: "CDR Australia Migration",
+  cdrskillassesement: "CDR Skill Assessment",
+  cdrwrititngexpert: "CDR Writing Expert",
+  cdrassessmenthelp: "CDR Assessment Help",
+  cdrreportwriter: "CDR Report Writers",
+  acsrpwriting: "ACSRPL Writing",
+  pteretargeting: "PTE Hub",
+  retargetingccl: "CCL Hub",
+  cclretargeting: "CCL Hub",
+};
+
+for (const name of LEAD_SOURCES) {
+  SOURCE_BY_KEY[compactAlphaNum(name)] = name;
+}
+for (const name of PORTAL_WEBSITES) {
+  PORTAL_BY_KEY[portalLookupKey(name)] = name;
+  PORTAL_BY_KEY[compactAlphaNum(name)] = name;
+}
+
+const CANONICAL_SOURCE_SET = new Set<string>(LEAD_SOURCES);
+const CANONICAL_PORTAL_SET = new Set<string>(PORTAL_WEBSITES);
+
+function reservedFacet(raw: string) {
+  const key = raw.trim().toLowerCase();
+  return key === "none" || key === "unassigned" || key === "";
+}
+
+/** Map stored / legacy source strings onto the premium list. */
+export function canonicalizeSource(raw: string | null | undefined): string {
+  const s = String(raw ?? "").trim();
+  if (!s || reservedFacet(s)) return s;
+  if (CANONICAL_SOURCE_SET.has(s)) return s;
+  const fromBase = SOURCE_BY_KEY[compactAlphaNum(sourceBase(s))];
+  if (fromBase) return fromBase;
+  const fromAll = SOURCE_BY_KEY[compactAlphaNum(s)];
+  if (fromAll) return fromAll;
+  const lower = s.toLowerCase();
+  for (const name of LEAD_SOURCES) {
+    const n = name.toLowerCase();
+    if (lower === n || lower.startsWith(`${n} —`) || lower.startsWith(`${n} -`)) {
+      return name;
+    }
+  }
+  return s;
+}
+
+/** Map typos, .com variants, and spacing onto the portal list. */
+export function canonicalizePortal(raw: string | null | undefined): string {
+  const s = String(raw ?? "").trim();
+  if (!s || reservedFacet(s)) return s;
+  if (CANONICAL_PORTAL_SET.has(s)) return s;
+  return (
+    PORTAL_BY_KEY[portalLookupKey(s)] ||
+    PORTAL_BY_KEY[compactAlphaNum(s)] ||
+    [...PORTAL_WEBSITES].find((name) => name.toLowerCase() === s.toLowerCase()) ||
+    s
+  );
+}
+
+export function isCanonicalPortal(raw: string | null | undefined) {
+  const mapped = canonicalizePortal(raw);
+  return CANONICAL_PORTAL_SET.has(mapped);
+}
+
+export function isCanonicalSource(raw: string | null | undefined) {
+  const mapped = canonicalizeSource(raw);
+  return CANONICAL_SOURCE_SET.has(mapped);
+}
 
 export const QUALIFICATION_OPTIONS = [
   { value: "QUALIFIED", label: "Qualified" },

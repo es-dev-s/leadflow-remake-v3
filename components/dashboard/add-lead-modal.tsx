@@ -16,6 +16,9 @@ import {
   PORTAL_OTHER,
   PORTAL_WEBSITES,
   QUALIFICATION_OPTIONS,
+  canonicalizePortal,
+  canonicalizeSource,
+  isCanonicalPortal,
   qualificationLabel,
   type CreateLeadPayload,
 } from "@/lib/lead-form-options";
@@ -41,6 +44,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -207,8 +211,10 @@ function durationBetween(clientAt: string, agentAt: string): number | null {
 }
 
 function formFromDetail(detail: LeadDetail): FormState {
-  const portal = (detail.portalWebsite ?? "").trim();
-  const knownPortal = (PORTAL_WEBSITES as readonly string[]).includes(portal);
+  const storedPortal = (detail.portalWebsite ?? "").trim();
+  const mappedPortal = canonicalizePortal(storedPortal);
+  const knownPortal = isCanonicalPortal(mappedPortal);
+  const mappedSource = canonicalizeSource(detail.source ?? "");
   const phone = ensurePhonePrefix(detail.phone, detail.country ?? "");
   const countryFromPhone = matchCountryFromPhone(phone, detail.country ?? "");
   const knownCountry = findCountryByName(detail.country ?? "");
@@ -223,13 +229,13 @@ function formFromDetail(detail: LeadDetail): FormState {
     phone,
     country,
     city: detail.city ?? "",
-    portalSelect: portal
+    portalSelect: storedPortal
       ? knownPortal
-        ? portal
+        ? mappedPortal
         : PORTAL_OTHER
       : "",
-    portalOther: portal && !knownPortal ? portal : "",
-    source: detail.source ?? "",
+    portalOther: storedPortal && !knownPortal ? storedPortal : "",
+    source: mappedSource,
     facebookProfile: detail.facebookProfile ?? "",
     language: detail.language ?? "",
     clientProfile: detail.clientProfile ?? "",
@@ -277,6 +283,10 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
   const [existingPortals, setExistingPortals] = useState<string[]>([]);
   const [existingSources, setExistingSources] = useState<string[]>([]);
   const [phoneChecking, setPhoneChecking] = useState(false);
+  // Parent often passes an inline onClose. Keep the latest fn in a ref so
+  // hydrate/escape effects do not re-run when LeadsContent re-renders.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   function clearPhonePresence() {
     setPhoneTeam(null);
@@ -287,9 +297,9 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (open && !isEdit && !allowCreate) {
-      onClose();
+      onCloseRef.current();
     }
-  }, [open, isEdit, allowCreate, onClose]);
+  }, [open, isEdit, allowCreate]);
 
   useEffect(() => {
     setMounted(true);
@@ -331,7 +341,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
         if (controller.signal.aborted) return;
         if (isLeadNotAppropriate(detail)) {
           setError("Not appropriate leads cannot be edited");
-          onClose();
+          onCloseRef.current();
           return;
         }
         setForm(formFromDetail(detail));
@@ -346,21 +356,21 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
       });
 
     return () => controller.abort();
-  }, [open, leadId, onClose]);
+  }, [open, leadId]);
 
   useEffect(() => {
     if (!present) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !submitting && open) onClose();
+      if (event.key === "Escape" && !submitting && open) onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKey);
     };
-  }, [present, open, onClose, submitting]);
+  }, [present, open, submitting]);
 
   const portalIsOther = form.portalSelect === PORTAL_OTHER;
   const portalWebsiteValue = portalIsOther
@@ -370,20 +380,28 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     const known = new Set<string>([
       ...PORTAL_WEBSITES,
       PORTAL_OTHER,
-      ...BASE_PORTAL_OPTIONS.map((o) => o.value),
     ]);
     const extras = existingPortals
-      .filter((p) => p && !known.has(p) && p !== form.portalOther.trim())
+      .map((p) => canonicalizePortal(p))
+      .filter(
+        (p) =>
+          p &&
+          !known.has(p) &&
+          p !== form.portalOther.trim() &&
+          p !== PORTAL_OTHER,
+      )
+      .filter((p, i, all) => all.indexOf(p) === i)
       .map((p) => ({ value: p, label: p }));
+    const selected = form.portalSelect;
     if (
-      form.portalSelect &&
-      form.portalSelect !== PORTAL_OTHER &&
-      !known.has(form.portalSelect) &&
-      !extras.some((e) => e.value === form.portalSelect)
+      selected &&
+      selected !== PORTAL_OTHER &&
+      !known.has(selected) &&
+      !extras.some((e) => e.value === selected)
     ) {
       extras.unshift({
-        value: form.portalSelect,
-        label: form.portalSelect,
+        value: selected,
+        label: selected,
       });
     }
     return [...extras, ...BASE_PORTAL_OPTIONS];
@@ -391,19 +409,13 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
   const markedPortalValues = useMemo(() => {
     const marked = new Set<string>();
-    const knownByLower = new Map(
-      PORTAL_WEBSITES.map((p) => [p.toLowerCase(), p] as const),
-    );
     for (const p of existingPortals) {
-      const t = p.trim();
-      if (!t) continue;
-      const known = knownByLower.get(t.toLowerCase());
-      if (known) {
-        marked.add(known);
-      } else {
-        // Custom / free-text portals map to the Other option + exact value.
+      const mapped = canonicalizePortal(p);
+      if (!mapped) continue;
+      if (isCanonicalPortal(mapped)) marked.add(mapped);
+      else {
         marked.add(PORTAL_OTHER);
-        marked.add(t);
+        marked.add(mapped);
       }
     }
     return [...marked];
@@ -411,13 +423,9 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
   const markedSourceValues = useMemo(() => {
     const marked = new Set<string>();
-    const knownByLower = new Map(
-      LEAD_SOURCES.map((s) => [s.toLowerCase(), s] as const),
-    );
     for (const s of existingSources) {
-      const t = s.trim();
-      if (!t) continue;
-      marked.add(knownByLower.get(t.toLowerCase()) ?? t);
+      const mapped = canonicalizeSource(s);
+      if (mapped) marked.add(mapped);
     }
     return [...marked];
   }, [existingSources]);
@@ -430,15 +438,13 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     const extras: { value: string; label: string }[] = [];
     const seen = new Set<string>(LEAD_SOURCES);
     for (const s of existingSources) {
-      if (s && !seen.has(s)) {
-        seen.add(s);
-        extras.push({ value: s, label: s });
+      const mapped = canonicalizeSource(s);
+      if (mapped && !seen.has(mapped)) {
+        seen.add(mapped);
+        extras.push({ value: mapped, label: mapped });
       }
     }
-    if (
-      form.source &&
-      !seen.has(form.source)
-    ) {
+    if (form.source && !seen.has(form.source)) {
       extras.unshift({ value: form.source, label: form.source });
     }
     return [...extras, ...base];
@@ -753,6 +759,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
 
         <form
           onSubmit={handleSubmit}
+          autoComplete="off"
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           <div className="lf-scroll relative min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">

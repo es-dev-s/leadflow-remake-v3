@@ -14,6 +14,10 @@ import {
   type LeadsDeepLink,
 } from "@/lib/leads-href";
 import { normalizeDateRange } from "@/lib/lead-filter-labels";
+import {
+  canonicalizePortal,
+  canonicalizeSource,
+} from "@/lib/lead-form-options";
 import { useLeadsScrollStore } from "@/store/leads-scroll-store";
 
 type SelectedMap = Record<string, true>;
@@ -472,8 +476,8 @@ export const useLeadsStore = create<LeadsState>()(
           teamId: facets.teamId?.trim() ?? "",
           analystId: facets.analystId?.trim() ?? "",
           salesExecId: facets.salesExecId?.trim() ?? "",
-          source: facets.source?.trim() ?? "",
-          portal: facets.portal?.trim() ?? "",
+          source: canonicalizeSource(facets.source?.trim() ?? ""),
+          portal: canonicalizePortal(facets.portal?.trim() ?? ""),
           metaProfile: facets.metaProfile?.trim() ?? "",
           status,
           stage: facets.stage?.trim() ?? "",
@@ -522,8 +526,8 @@ export const useLeadsStore = create<LeadsState>()(
           teamId: link.teamId?.trim() ?? "",
           analystId: link.analystId?.trim() ?? "",
           salesExecId: link.salesExecId?.trim() ?? "",
-          source: link.source?.trim() ?? "",
-          portal: link.portal?.trim() ?? "",
+          source: canonicalizeSource(link.source?.trim() ?? ""),
+          portal: canonicalizePortal(link.portal?.trim() ?? ""),
           metaProfile: link.metaProfile?.trim() ?? "",
           status,
           stage: link.stage?.trim() ?? "",

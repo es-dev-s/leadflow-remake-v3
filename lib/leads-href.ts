@@ -1,3 +1,8 @@
+import {
+  canonicalizePortal,
+  canonicalizeSource,
+} from "@/lib/lead-form-options";
+
 /** Shared deep-link params for /leads from the dashboard. */
 
 export type LeadsDeepLink = {
@@ -73,12 +78,21 @@ export function mergeLeadDeepLink(
   return merged;
 }
 
+function cleanAttrParam(key: string, value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.toLowerCase() === "none") return "none";
+  if (key === "source") return canonicalizeSource(trimmed);
+  if (key === "portal") return canonicalizePortal(trimmed);
+  return trimmed;
+}
+
 export function buildLeadsHref(link: LeadsDeepLink): string {
   const sp = new URLSearchParams();
   for (const key of PARAM_KEYS) {
     const value = link[key];
     if (typeof value === "string" && value.trim()) {
-      sp.set(key, value.trim());
+      sp.set(key, cleanAttrParam(key, value));
     }
   }
   const qs = sp.toString();
@@ -89,6 +103,8 @@ export function parseLeadsDeepLink(
   searchParams: URLSearchParams | { get: (key: string) => string | null },
 ): LeadsDeepLink {
   const get = (key: string) => searchParams.get(key)?.trim() || undefined;
+  const source = get("source");
+  const portal = get("portal");
   return {
     filter: get("filter"),
     country: get("country"),
@@ -96,8 +112,8 @@ export function parseLeadsDeepLink(
     teamId: get("teamId"),
     analystId: get("analystId"),
     salesExecId: get("salesExecId"),
-    source: get("source"),
-    portal: get("portal"),
+    source: source ? cleanAttrParam("source", source) : undefined,
+    portal: portal ? cleanAttrParam("portal", portal) : undefined,
     metaProfile: get("metaProfile"),
     status: get("status"),
     stage: get("stage"),

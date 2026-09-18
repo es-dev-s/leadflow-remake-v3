@@ -1176,6 +1176,11 @@ export function LeadsContent() {
   const closeLeadPreview = useUiStore((s) => s.closeLeadPreview);
   const openLeadPreview = useUiStore((s) => s.openLeadPreview);
 
+  const closeLeadForm = useCallback(() => {
+    setLeadFormOpen(false);
+    setEditingLeadId(null);
+  }, []);
+
   const openCreateLead = useCallback(() => {
     if (!allowCreate) return;
     setEditingLeadId(null);
@@ -1423,10 +1428,7 @@ export function LeadsContent() {
       <AddLeadModal
         open={leadFormOpen}
         leadId={editingLeadId}
-        onClose={() => {
-          setLeadFormOpen(false);
-          setEditingLeadId(null);
-        }}
+        onClose={closeLeadForm}
         onSaved={(event) => {
           void (async () => {
             if (event.mode === "edit") {

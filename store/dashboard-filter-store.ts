@@ -5,6 +5,10 @@ import {
   dashboardFiltersToDeepLink,
   normalizeDateRange,
 } from "@/lib/lead-filter-labels";
+import {
+  canonicalizePortal,
+  canonicalizeSource,
+} from "@/lib/lead-form-options";
 import type { LeadsDeepLink } from "@/lib/leads-href";
 
 export type DashboardFilters = {
@@ -123,8 +127,8 @@ function normalize(next: DashboardFilters): DashboardFilters {
   return {
     country: next.country?.trim() ?? "",
     city: next.city?.trim() ?? "",
-    source: next.source?.trim() ?? "",
-    portal: next.portal?.trim() ?? "",
+    source: canonicalizeSource(next.source?.trim() ?? ""),
+    portal: canonicalizePortal(next.portal?.trim() ?? ""),
     teamId: next.teamId?.trim() ?? "",
     teamName: next.teamName?.trim() ?? "",
     analystId: next.analystId?.trim() ?? "",

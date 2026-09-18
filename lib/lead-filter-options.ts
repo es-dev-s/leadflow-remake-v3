@@ -21,21 +21,6 @@ export type LeadFilterOptions = {
   portals: string[];
 };
 
-function uniqueSortedNames(values: string[]) {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of values) {
-    const name = raw.trim();
-    if (!name) continue;
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    if (key === "unassigned" || key === "unknown" || key === "none") continue;
-    seen.add(key);
-    out.push(name);
-  }
-  return out.sort((a, b) => a.localeCompare(b));
-}
-
 async function safe<T>(fn: () => Promise<T>, fallback: T, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return fallback;
   try {
@@ -57,62 +42,40 @@ export async function loadLeadFilterOptions(input: {
   const { signal } = input;
   const emptyUsers: AssignableUser[] = [];
   const emptyAnalysts = { items: [] as AnalystLeadStats[] };
-  const emptyNamed = { items: [] as Array<{ name: string }> };
 
-  const [geo, teams, members, analystsPage, sourcesPage, portalsPage] =
-    await Promise.all([
-      safe(
-        () => fetchGeoOptions({ type: "countries", signal }),
-        { type: "countries" as const, items: [] as NamedCount[] },
-        signal,
-      ),
-      input.hideTeam
-        ? Promise.resolve([] as FilterOption[])
-        : safe(
-            async () =>
-              (await fetchTeams(signal)).map((row) => ({
-                id: row.id,
-                name: row.name,
-              })),
-            [],
-            signal,
-          ),
-      input.hideSalesExec
-        ? Promise.resolve(emptyUsers)
-        : safe(() => fetchAssignableUsers("members", signal), emptyUsers, signal),
-      input.hideAnalyst
-        ? Promise.resolve(emptyAnalysts)
-        : safe(
-            () =>
-              fetchSummaryBuckets<AnalystLeadStats>({
-                dimension: "analyst",
-                limit: 200,
-                signal,
-              }),
-            emptyAnalysts,
-            signal,
-          ),
-      safe(
-        () =>
-          fetchSummaryBuckets<{ name: string }>({
-            dimension: "source",
-            limit: 200,
-            signal,
-          }),
-        emptyNamed,
-        signal,
-      ),
-      safe(
-        () =>
-          fetchSummaryBuckets<{ name: string }>({
-            dimension: "portal",
-            limit: 200,
-            signal,
-          }),
-        emptyNamed,
-        signal,
-      ),
-    ]);
+  const [geo, teams, members, analystsPage] = await Promise.all([
+    safe(
+      () => fetchGeoOptions({ type: "countries", signal }),
+      { type: "countries" as const, items: [] as NamedCount[] },
+      signal,
+    ),
+    input.hideTeam
+      ? Promise.resolve([] as FilterOption[])
+      : safe(
+          async () =>
+            (await fetchTeams(signal)).map((row) => ({
+              id: row.id,
+              name: row.name,
+            })),
+          [],
+          signal,
+        ),
+    input.hideSalesExec
+      ? Promise.resolve(emptyUsers)
+      : safe(() => fetchAssignableUsers("members", signal), emptyUsers, signal),
+    input.hideAnalyst
+      ? Promise.resolve(emptyAnalysts)
+      : safe(
+          () =>
+            fetchSummaryBuckets<AnalystLeadStats>({
+              dimension: "analyst",
+              limit: 200,
+              signal,
+            }),
+          emptyAnalysts,
+          signal,
+        ),
+  ]);
 
   return {
     countries: geo.items ?? [],
@@ -125,13 +88,7 @@ export async function loadLeadFilterOptions(input: {
         name: row.name || row.email || row.id,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    sources: uniqueSortedNames([
-      ...LEAD_SOURCES,
-      ...(sourcesPage.items ?? []).map((row) => row.name),
-    ]),
-    portals: uniqueSortedNames([
-      ...PORTAL_WEBSITES,
-      ...(portalsPage.items ?? []).map((row) => row.name),
-    ]),
+    sources: [...LEAD_SOURCES],
+    portals: [...PORTAL_WEBSITES],
   };
 }
