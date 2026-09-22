@@ -6,7 +6,7 @@ import {
   markNotificationsRead,
   type AppNotification,
 } from "@/lib/api";
-import { LEAD_COLUMNS } from "@/lib/leads-columns";
+import { leadColumnsForRole } from "@/lib/leads-columns";
 import { getNavItemByPath } from "@/lib/navigation";
 import { subscribeRealtime } from "@/lib/realtime";
 import { canViewLeadData } from "@/lib/roles";
@@ -73,7 +73,7 @@ export function Navbar() {
   const searchActive =
     searchBarOpen || searchOpenLocal || searchQuery.trim().length > 0 || Boolean(searchField);
 
-  const searchScopeLabel = LEAD_COLUMNS.find((c) => c.id === searchField)?.label;
+  const searchScopeLabel = leadColumnsForRole(role).find((c) => c.id === searchField)?.label;
 
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);

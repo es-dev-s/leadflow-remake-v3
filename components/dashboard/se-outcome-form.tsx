@@ -1,12 +1,16 @@
 "use client";
 
 import { ActionButton } from "@/components/dashboard/action-button";
+import { ScreenAwareDateTimePicker } from "@/components/dashboard/screen-aware-datetime-picker";
 import {
   updateLeadSalesOutcome,
   type LeadDetail,
+  type SalesOutcomePayload,
 } from "@/lib/api";
+import { toBusinessDateTimeInput } from "@/lib/datetime";
 import {
   SE_OUTCOME_OPTIONS,
+  isClosedSeOutcome,
   isSeOutcomeValue,
   type SeOutcomeValue,
 } from "@/lib/lead-filter-labels";
@@ -45,6 +49,7 @@ function parseMoney(raw: string): number | null {
 export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
   const patchLead = useLeadsStore((s) => s.patchLead);
   const [stage, setStage] = useState<SeOutcomeValue | "">("");
+  const [closedAt, setClosedAt] = useState("");
   const [initialPayment, setInitialPayment] = useState("");
   const [closedRevenue, setClosedRevenue] = useState("");
   const [notes, setNotes] = useState("");
@@ -61,6 +66,11 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
   useEffect(() => {
     if (!detail || detail.id !== leadId) return;
     setStage(isSeOutcomeValue(detail.salesStage) ? detail.salesStage : "");
+    setClosedAt(
+      isClosedSeOutcome(detail.salesStage)
+        ? toBusinessDateTimeInput(detail.closedAt)
+        : "",
+    );
     setInitialPayment(moneyInputValue(detail.initialPayment));
     setClosedRevenue(
       moneyInputValue(
@@ -73,10 +83,12 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
   }, [detail, leadId, reset]);
 
   const closedRequiresRevenue = stage === "CLOSED_WON";
+  const closing = isClosedSeOutcome(stage);
   const currency = detail?.dealCurrency?.trim() || "AUD";
 
   const canSave = useMemo(() => {
     if (!stage) return false;
+    if (closing && !closedAt.trim()) return false;
     if (closedRequiresRevenue) {
       const revenue = parseMoney(closedRevenue);
       if (revenue == null || Number.isNaN(revenue) || revenue <= 0) return false;
@@ -87,7 +99,7 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
     if (revenue != null && revenue < 0) return false;
     if (Number.isNaN(payment) || Number.isNaN(revenue)) return false;
     return true;
-  }, [stage, closedRequiresRevenue, closedRevenue, initialPayment]);
+  }, [stage, closing, closedAt, closedRequiresRevenue, closedRevenue, initialPayment]);
 
   async function handleSave() {
     if (saving || !canSave || !stage) return;
@@ -95,6 +107,10 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
     const revenue = parseMoney(closedRevenue);
     if (Number.isNaN(payment) || Number.isNaN(revenue)) {
       setError("Enter valid amounts");
+      return;
+    }
+    if (closing && !closedAt.trim()) {
+      setError("Closed date is required when outcome is Closed or Lost");
       return;
     }
     if (stage === "CLOSED_WON" && (revenue == null || revenue <= 0)) {
@@ -109,12 +125,16 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
     start();
     setError(null);
     try {
-      const result = await updateLeadSalesOutcome(leadId, {
+      const payload: SalesOutcomePayload = {
         salesStage: stage,
         initialPayment: payment,
         closedRevenue: revenue,
         executiveNotes: notes.trim() || null,
-      });
+      };
+      if (closing) {
+        payload.closedAt = closedAt.trim();
+      }
+      const result = await updateLeadSalesOutcome(leadId, payload);
       patchLead(leadId, leadDetailToListPatch(result));
       onSaved?.(result);
       await succeed("Saved");
@@ -131,8 +151,8 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
           Edit · Sales outcome
         </p>
         <p className="mt-1 text-[12px] leading-snug text-[#868e96]">
-          Update payment, deal value (closed revenue), outcome status, and your
-          notes for this lead.
+          Update payment, deal value (closed revenue), outcome status, close
+          date, and your notes for this lead.
         </p>
       </div>
 
@@ -147,7 +167,12 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
               <button
                 key={option.value}
                 type="button"
-                onClick={() => setStage(option.value)}
+                onClick={() => {
+                  setStage(option.value);
+                  if (!isClosedSeOutcome(option.value)) {
+                    setClosedAt("");
+                  }
+                }}
                 className={[
                   "lf-pressable rounded-xl border px-3 py-2 text-left text-[12px] font-medium transition-colors",
                   active
@@ -161,6 +186,31 @@ export function SeOutcomeForm({ leadId, detail, onSaved }: Props) {
           })}
         </div>
       </div>
+
+      {closing ? (
+        <div className="space-y-1.5">
+          <label
+            htmlFor={`se-closed-at-${leadId}`}
+            className="flex items-baseline justify-between gap-2 text-[10px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase"
+          >
+            <span>Closed date</span>
+            <span className="normal-case tracking-normal text-[#e8590c]">
+              Required
+            </span>
+          </label>
+          <ScreenAwareDateTimePicker
+            id={`se-closed-at-${leadId}`}
+            mode="datetime"
+            value={closedAt}
+            onChange={setClosedAt}
+            disabled={saving}
+            placeholder="Select closed date & time"
+          />
+          <p className="text-[11px] leading-snug text-[#868e96]">
+            Enter the actual close date. It is not filled automatically.
+          </p>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3">
         <div>

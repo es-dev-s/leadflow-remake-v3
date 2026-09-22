@@ -774,6 +774,7 @@ export type SalesOutcomePayload = {
   initialPayment?: number | null;
   closedRevenue?: number | null;
   executiveNotes?: string | null;
+  closedAt?: string | null;
 };
 
 export async function updateLeadSalesOutcome(

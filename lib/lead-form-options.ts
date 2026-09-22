@@ -1,13 +1,8 @@
-export const PORTAL_WEBSITES = [
+export const PORTAL_WEBSITES_PRIMARY = [
   "ACSRPL Australia",
   "ACSRPL Report",
   "ACSRPL Writing",
-  "Best CDR Writer",
-  "CCL Hub",
   "CDR Assessment Help",
-  "CDR Australia Expert",
-  "CDR Australia Group",
-  "CDR Australia Help",
   "CDR Australia Migration",
   "CDR Australia Online",
   "CDR Australia Service",
@@ -23,14 +18,38 @@ export const PORTAL_WEBSITES = [
   "CDR Writing Expert",
   "Immidocs",
   "Migration Match",
-  "Migration Skills Australia",
-  "Nepali Naati CCL",
-  "PTE Hub",
   "Report Champs",
-  "Report Insiders",
   "Top CDR Australia",
   "Write My CDR",
 ] as const;
+
+export const PORTAL_WEBSITES_EDUCATIONAL = [
+  "CCL HUB",
+  "CCL HUB Website",
+  "PTE HUB META",
+  "PTE HUB WEBSITE",
+  "NEPALI NAATI CCL",
+] as const;
+
+export const PORTAL_WEBSITES = [
+  ...PORTAL_WEBSITES_PRIMARY,
+  ...PORTAL_WEBSITES_EDUCATIONAL,
+] as const;
+
+const EDUCATIONAL_PORTAL_SET = new Set<string>(PORTAL_WEBSITES_EDUCATIONAL);
+
+export function splitPortalFilterOptions(portals: string[]) {
+  const primary: string[] = [];
+  const found = new Set<string>();
+  for (const portal of portals) {
+    if (EDUCATIONAL_PORTAL_SET.has(portal)) found.add(portal);
+    else primary.push(portal);
+  }
+  return {
+    primary,
+    educational: PORTAL_WEBSITES_EDUCATIONAL.filter((name) => found.has(name)),
+  };
+}
 
 export const PORTAL_OTHER = "Other — not in list";
 
@@ -41,7 +60,6 @@ export const LEAD_SOURCES = [
   "Website Download Form",
   "Google Lead Form",
   "Support WA numbers",
-  "Meta Lead Form",
 ] as const;
 
 function compactAlphaNum(value: string) {
@@ -83,7 +101,6 @@ const SOURCE_BY_KEY: Record<string, string> = {
   gwhatsappcamcwacrw: "Support WA numbers",
   supportwanumbers: "Support WA numbers",
   supportwa: "Support WA numbers",
-  metaleadform: "Meta Lead Form",
 };
 
 const PORTAL_BY_KEY: Record<string, string> = {
@@ -93,9 +110,12 @@ const PORTAL_BY_KEY: Record<string, string> = {
   cdrassessmenthelp: "CDR Assessment Help",
   cdrreportwriter: "CDR Report Writers",
   acsrpwriting: "ACSRPL Writing",
-  pteretargeting: "PTE Hub",
-  retargetingccl: "CCL Hub",
-  cclretargeting: "CCL Hub",
+  cclhub: "CCL HUB",
+  cchlubwebsite: "CCL HUB Website",
+  cclhubwebsite: "CCL HUB Website",
+  ptehubmeta: "PTE HUB META",
+  ptehubwebsite: "PTE HUB WEBSITE",
+  nepalinaaticcl: "NEPALI NAATI CCL",
 };
 
 for (const name of LEAD_SOURCES) {

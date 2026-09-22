@@ -15,6 +15,8 @@ import {
   LEAD_SOURCES,
   PORTAL_OTHER,
   PORTAL_WEBSITES,
+  PORTAL_WEBSITES_EDUCATIONAL,
+  PORTAL_WEBSITES_PRIMARY,
   QUALIFICATION_OPTIONS,
   canonicalizePortal,
   canonicalizeSource,
@@ -250,8 +252,19 @@ function formFromDetail(detail: LeadDetail): FormState {
   };
 }
 
+const PORTAL_GROUP_EDUCATIONAL = "__portal_group_educational";
+
 const BASE_PORTAL_OPTIONS = [
-  ...PORTAL_WEBSITES.map((portal) => ({ value: portal, label: portal })),
+  ...PORTAL_WEBSITES_PRIMARY.map((portal) => ({ value: portal, label: portal })),
+  {
+    value: PORTAL_GROUP_EDUCATIONAL,
+    label: "Educational Websites",
+    heading: true as const,
+  },
+  ...PORTAL_WEBSITES_EDUCATIONAL.map((portal) => ({
+    value: portal,
+    label: portal,
+  })),
   { value: PORTAL_OTHER, label: PORTAL_OTHER },
 ];
 
@@ -380,6 +393,7 @@ export function AddLeadModal({ open, leadId, onClose, onSaved }: Props) {
     const known = new Set<string>([
       ...PORTAL_WEBSITES,
       PORTAL_OTHER,
+      PORTAL_GROUP_EDUCATIONAL,
     ]);
     const extras = existingPortals
       .map((p) => canonicalizePortal(p))

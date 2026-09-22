@@ -58,6 +58,10 @@ export function isSeOutcomeValue(
   return SE_OUTCOME_OPTIONS.some((option) => option.value === value);
 }
 
+export function isClosedSeOutcome(value: string | null | undefined) {
+  return value === "CLOSED_WON" || value === "CLOSED_LOST";
+}
+
 export function seOutcomeLabel(value: string | null | undefined) {
   const match = SE_OUTCOME_OPTIONS.find((option) => option.value === value);
   return match?.label ?? (value ? value.replace(/_/g, " ") : "");

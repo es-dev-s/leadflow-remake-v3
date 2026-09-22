@@ -29,6 +29,8 @@ import {
   canEditLeadProfile,
   canMarkNotAppropriate,
   canUpdateSalesOutcome,
+  canViewDealValue,
+  canViewFirstResponseProof,
   isSalesExecutive,
 } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
@@ -208,6 +210,8 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   const allowProfileEdit = canEditLeadProfile(role);
   const allowSalesOutcome = canUpdateSalesOutcome(role);
+  const allowDealValue = canViewDealValue(role);
+  const allowFirstResponseProof = canViewFirstResponseProof(role);
   const allowNotAppropriate = canMarkNotAppropriate(role);
   const seMode = isSalesExecutive(role);
   const patchLead = useLeadsStore((s) => s.patchLead);
@@ -240,11 +244,12 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
     closedStage === "CLOSED_LOST" ||
     closedOutcome === "Closed" ||
     closedOutcome === "Lost";
-  const dealValue =
-    detail?.dealValueDisplay ||
-    (detail?.dealValue != null
-      ? `${detail.dealCurrency || "AUD"} ${detail.dealValue}`
-      : listLead?.dealValue);
+  const dealValue = allowDealValue
+    ? detail?.dealValueDisplay ||
+      (detail?.dealValue != null
+        ? `${detail.dealCurrency || "AUD"} ${detail.dealValue}`
+        : listLead?.dealValue)
+    : undefined;
   const initialPayment =
     detail?.initialPayment != null
       ? `${detail.dealCurrency || "AUD"} ${detail.initialPayment}`
@@ -607,7 +612,9 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                   {!isSettled ? (
                     <>
                       <Field label="Initial payment" value={initialPayment} />
-                      <Field label="Deal value" value={dealValue} />
+                      {allowDealValue ? (
+                        <Field label="Deal value" value={dealValue} />
+                      ) : null}
                       <Field
                         label="Closed"
                         value={detail?.closed || listLead?.closed || "Open"}
@@ -719,11 +726,13 @@ export function LeadPreviewSidebar({ onEdit }: Props) {
                     }
                   />
                 </div>
-                {detail?.firstResponseProofPath ? (
-                  <ProofThumb path={detail.firstResponseProofPath} />
-                ) : (
-                  <p className="text-[12px] text-[#adb5bd]">No screenshot proof</p>
-                )}
+                {allowFirstResponseProof ? (
+                  detail?.firstResponseProofPath ? (
+                    <ProofThumb path={detail.firstResponseProofPath} />
+                  ) : (
+                    <p className="text-[12px] text-[#adb5bd]">No screenshot proof</p>
+                  )
+                ) : null}
               </section>
 
               <section className="space-y-3 border-t border-[rgba(33,37,41,0.05)] pt-4">

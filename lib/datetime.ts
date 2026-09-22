@@ -133,6 +133,32 @@ export function formatDurationMinutes(minutes: number | null | undefined): strin
   return `${h}h ${m}m`;
 }
 
+/** Naive YYYY-MM-DDTHH:mm in Kathmandu for datetime pickers. */
+export function toBusinessDateTimeInput(
+  value: string | number | Date | null | undefined,
+): string {
+  const dt = asDate(value);
+  if (!dt) return "";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: DISPLAY_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(dt)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  if (!parts.year || !parts.month || !parts.day || !parts.hour || !parts.minute) {
+    return "";
+  }
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
 /** Prefer ISO closedAt; em dash when the lead is still open. */
 export function formatLeadClosedAt(
   closedAt: string | null | undefined,

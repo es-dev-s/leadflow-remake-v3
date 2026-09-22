@@ -5,7 +5,7 @@ import { Check, LoaderCircle, RotateCcw, SlidersHorizontal, X } from "lucide-rea
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FilterPanelShell } from "@/components/dashboard/filter-panel-shell";
 import { loadLeadFilterOptions } from "@/lib/lead-filter-options";
-import { QUALIFICATION_OPTIONS } from "@/lib/lead-form-options";
+import { QUALIFICATION_OPTIONS, splitPortalFilterOptions } from "@/lib/lead-form-options";
 import {
   BLANK_GEO,
   filterCityGeoOptions,
@@ -170,6 +170,10 @@ export function LeadFilterSidebar() {
   const hasActive =
     applied.filterValue !== "all" ||
     Object.values(applied.facets).some(Boolean);
+  const portalGroups = useMemo(
+    () => splitPortalFilterOptions(portals),
+    [portals],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -450,11 +454,20 @@ export function LeadFilterSidebar() {
                 >
                   <option value="">Any</option>
                   <option value="none">Blank</option>
-                  {portals.map((portal) => (
+                  {portalGroups.primary.map((portal) => (
                     <option key={portal} value={portal}>
                       {portal}
                     </option>
                   ))}
+                  {portalGroups.educational.length > 0 ? (
+                    <optgroup label="Educational Websites">
+                      {portalGroups.educational.map((portal) => (
+                        <option key={portal} value={portal}>
+                          {portal}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
                 </SelectField>
               </div>
 

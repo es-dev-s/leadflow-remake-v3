@@ -1,3 +1,5 @@
+import { canViewDealValue } from "@/lib/roles";
+
 export type LeadColumnId =
   | "source"
   | "portal"
@@ -85,3 +87,11 @@ export const DEFAULT_VISIBLE_COLUMNS: Record<LeadColumnId, boolean> = {
   dealValue: false,
   salesExecutive: false,
 };
+
+/** Columns the signed-in role may customize or render. */
+export function leadColumnsForRole(
+  role: string | null | undefined,
+): LeadColumnDef[] {
+  if (canViewDealValue(role)) return LEAD_COLUMNS;
+  return LEAD_COLUMNS.filter((column) => column.id !== "dealValue");
+}

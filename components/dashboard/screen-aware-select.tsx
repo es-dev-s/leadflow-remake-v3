@@ -21,6 +21,8 @@ import {
 export type SelectOption = {
   value: string;
   label: string;
+  /** Non-selectable group label (e.g. Educational Websites). */
+  heading?: boolean;
 };
 
 type Props = {
@@ -81,7 +83,8 @@ export function ScreenAwareSelect({
   }, []);
 
   const selected = useMemo(
-    () => options.find((item) => item.value === value) ?? null,
+    () =>
+      options.find((item) => !item.heading && item.value === value) ?? null,
     [options, value],
   );
 
@@ -104,15 +107,45 @@ export function ScreenAwareSelect({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = !q
-      ? options
-      : options.filter(
-          (item) =>
-            item.label.toLowerCase().includes(q) ||
-            item.value.toLowerCase().includes(q),
-        );
-    // Surface on-file options first so the marks are easy to spot.
-    if (markedSet.size === 0) return list;
+    const match = (item: SelectOption) =>
+      item.label.toLowerCase().includes(q) ||
+      item.value.toLowerCase().includes(q);
+
+    const grouped: Array<{
+      heading?: SelectOption;
+      items: SelectOption[];
+    }> = [];
+    let current: { heading?: SelectOption; items: SelectOption[] } = {
+      items: [],
+    };
+    for (const item of options) {
+      if (item.heading) {
+        grouped.push(current);
+        current = { heading: item, items: [] };
+        continue;
+      }
+      current.items.push(item);
+    }
+    grouped.push(current);
+
+    const list: SelectOption[] = [];
+    for (const group of grouped) {
+      const headingMatch = Boolean(
+        q && group.heading && match(group.heading),
+      );
+      const hits = q
+        ? headingMatch
+          ? group.items
+          : group.items.filter(match)
+        : group.items;
+      if (hits.length === 0 && !headingMatch) continue;
+      if (group.heading) list.push(group.heading);
+      list.push(...hits);
+    }
+
+    if (q || markedSet.size === 0 || options.some((item) => item.heading)) {
+      return list;
+    }
     return [...list].sort((a, b) => {
       const am = markedSet.has(a.value.trim().toLowerCase()) ? 0 : 1;
       const bm = markedSet.has(b.value.trim().toLowerCase()) ? 0 : 1;
@@ -328,6 +361,17 @@ export function ScreenAwareSelect({
                   </p>
                 ) : (
                   filtered.map((option) => {
+                    if (option.heading) {
+                      return (
+                        <div
+                          key={option.value}
+                          role="presentation"
+                          className="px-3 pt-2.5 pb-1 text-[10px] font-medium tracking-[0.08em] text-[#adb5bd] uppercase"
+                        >
+                          {option.label}
+                        </div>
+                      );
+                    }
                     const active = option.value === value;
                     const marked = isMarked(option.value);
                     return (
@@ -338,6 +382,7 @@ export function ScreenAwareSelect({
                         aria-selected={active}
                         data-marked={marked || undefined}
                         onClick={() => {
+                          if (option.heading) return;
                           onChange(option.value);
                           close();
                         }}

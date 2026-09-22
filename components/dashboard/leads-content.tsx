@@ -34,7 +34,7 @@ import { QualificationBadgeSelect } from "@/components/dashboard/qualification-b
 import { useActionPhase } from "@/hooks/use-action-phase";
 import { isAssignableQualification, assignableQualificationHint } from "@/lib/lead-form-options";
 import {
-  LEAD_COLUMNS,
+  leadColumnsForRole,
   type LeadColumnId,
 } from "@/lib/leads-columns";
 import type { LeadRecord } from "@/lib/leads-data";
@@ -53,6 +53,7 @@ import {
   canCreateLeads,
   canDeleteLeads,
   canEditLeadProfile,
+  canViewDealValue,
 } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth-store";
 import { formatFacetChips, leadPresetOptionsForRole, presetLabelForRole } from "@/lib/lead-filter-labels";
@@ -598,8 +599,10 @@ function CustomizePanel() {
   const showAllColumns = useLeadsStore((s) => s.showAllColumns);
   const hideOptionalColumns = useLeadsStore((s) => s.hideOptionalColumns);
   const resetColumns = useLeadsStore((s) => s.resetColumns);
+  const role = useAuthStore((s) => s.user?.role);
+  const columns = leadColumnsForRole(role);
 
-  const visibleCount = LEAD_COLUMNS.filter(
+  const visibleCount = columns.filter(
     (column) => visibleColumns[column.id],
   ).length;
 
@@ -666,7 +669,7 @@ function CustomizePanel() {
                 Customize columns
               </p>
               <p className="mt-0.5 text-[12px] text-[#6c757d]">
-                {visibleCount} of {LEAD_COLUMNS.length} visible
+                {visibleCount} of {columns.length} visible
               </p>
             </div>
             <button
@@ -681,7 +684,7 @@ function CustomizePanel() {
         </div>
 
         <div className="lf-scroll max-h-[320px] overflow-y-auto px-2 py-2">
-          {LEAD_COLUMNS.map((column) => {
+          {columns.map((column) => {
             const visible = visibleColumns[column.id];
             return (
               <label
@@ -1201,6 +1204,15 @@ export function LeadsContent() {
   const setFilterValue = useLeadsStore((s) => s.setFilterValue);
   const setSortValue = useLeadsStore((s) => s.setSortValue);
   const visibleColumns = useLeadsStore((s) => s.visibleColumns);
+  const allowDealValue = canViewDealValue(role);
+  const availableColumns = useMemo(() => leadColumnsForRole(role), [role]);
+  const sortOptions = useMemo(
+    () =>
+      allowDealValue
+        ? SORT_OPTIONS
+        : SORT_OPTIONS.filter((option) => option.id !== "value"),
+    [allowDealValue],
+  );
 
   const {
     filterValue,
@@ -1221,6 +1233,18 @@ export function LeadsContent() {
   const facets = useLeadsStore((s) => s.facets);
   const clearFacets = useLeadsStore((s) => s.clearFacets);
   const applyDeepLink = useLeadsStore((s) => s.applyDeepLink);
+
+  useEffect(() => {
+    if (allowDealValue) return;
+    if (sortValue === "value") setSortValue("newest");
+    if (searchField === "dealValue") setSearchField("");
+  }, [
+    allowDealValue,
+    sortValue,
+    searchField,
+    setSortValue,
+    setSearchField,
+  ]);
 
   const refreshKeepingPlace = async (anchorId?: string) => {
     flushLeadsScrollSave();
@@ -1320,8 +1344,8 @@ export function LeadsContent() {
   );
 
   const visibleColumnDefs = useMemo(
-    () => LEAD_COLUMNS.filter((column) => visibleColumns[column.id]),
-    [visibleColumns],
+    () => availableColumns.filter((column) => visibleColumns[column.id]),
+    [availableColumns, visibleColumns],
   );
   const visibleColumnIds = useMemo(
     () => visibleColumnDefs.map((column) => column.id),
@@ -1339,7 +1363,7 @@ export function LeadsContent() {
 
   const filterLabel = presetLabelForRole(filterValue, role) || "Filter";
   const sortLabel =
-    SORT_OPTIONS.find((option) => option.id === sortValue)?.label ?? "Sort";
+    sortOptions.find((option) => option.id === sortValue)?.label ?? "Sort";
 
   const { sentinelRef, isLoadingMore } = useInfiniteLeadScroll({
     root: scrollRoot,
@@ -1391,7 +1415,7 @@ export function LeadsContent() {
             open={toolbarMenu === "sort"}
             onToggle={() => toggleToolbarMenu("sort")}
           >
-            {SORT_OPTIONS.map((option) => (
+            {sortOptions.map((option) => (
               <MenuOption
                 key={option.id}
                 label={option.label}
@@ -1660,13 +1684,13 @@ export function LeadsContent() {
               {searchQuery.trim()
                 ? searchField
                   ? ` · “${searchQuery.trim()}” in ${
-                      LEAD_COLUMNS.find((c) => c.id === searchField)?.label ??
+                      availableColumns.find((c) => c.id === searchField)?.label ??
                       searchField
                     }`
                   : ` · “${searchQuery.trim()}”`
                 : searchField
                   ? ` · focus ${
-                      LEAD_COLUMNS.find((c) => c.id === searchField)?.label ??
+                      availableColumns.find((c) => c.id === searchField)?.label ??
                       searchField
                     }`
                   : ""}

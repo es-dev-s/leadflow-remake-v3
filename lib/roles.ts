@@ -250,6 +250,18 @@ export function canUpdateSalesOutcome(role: string | null | undefined) {
   );
 }
 
+/** Closed-won deal value. Lead Analysts do not see this figure. */
+export function canViewDealValue(role: string | null | undefined) {
+  return canViewLeadData(role) && !isLeadAnalyst(role);
+}
+
+/** First-response screenshot in lead details. Superadmin, ATL, and LA only. */
+export function canViewFirstResponseProof(role: string | null | undefined) {
+  return (
+    isSuperadmin(role) || isAnalystTeamLead(role) || isLeadAnalyst(role)
+  );
+}
+
 /** Only Sales Executives may flag a lead as not appropriate. */
 export function canMarkNotAppropriate(role: string | null | undefined) {
   return isSalesExecutive(role);
